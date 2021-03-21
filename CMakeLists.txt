@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_executable(test src/main.cpp)
+add_executable(test src/main.cpp src/main_window.cpp)
 
 target_include_directories(test PRIVATE include)
 target_link_libraries(test ${wxWidgets_LIBRARIES})
