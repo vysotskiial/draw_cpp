@@ -53,7 +53,7 @@ void ControlPanel::generate_text_bitmaps()
 
 		KLFBackend::klfInput input;
 		input.latex = text.text.c_str();
-		input.fontsize = 8;
+		input.fontsize = 7;
 		input.mathmode = "\\begin{equation*} ... \\end{equation*}";
 		input.preamble = "\\usepackage{amsmath}\n";
 		input.dpi = 300;

@@ -1,4 +1,6 @@
 #include <cmath>
+#include <wx/graphics.h>
+#include <wx/dcgraph.h>
 #include "picture_panel.h"
 
 using namespace std;
@@ -6,6 +8,7 @@ PicturePanel::PicturePanel(wxPanel *p)
   : wxPanel(p, wxID_ANY, wxDefaultPosition, wxSize(picture_size, picture_size),
             wxBORDER_SUNKEN)
 {
+	SetBackgroundColour("White");
 	Bind(wxEVT_PAINT, &PicturePanel::on_paint, this);
 	Bind(wxEVT_MOTION, &PicturePanel::on_mouse_motion, this);
 	Bind(wxEVT_LEAVE_WINDOW, &PicturePanel::on_mouse_leave, this);
@@ -16,7 +19,7 @@ PicturePanel::PicturePanel(wxPanel *p)
 
 void PicturePanel::on_paint(wxPaintEvent &e)
 {
-	wxPaintDC dc(this);
+	wxGCDC dc(this);
 	dc.SetBackground(*wxWHITE_BRUSH);
 	if (!grid.finalized_border)
 		finalize_border();
@@ -27,7 +30,7 @@ void PicturePanel::on_paint(wxPaintEvent &e)
 	draw_text(dc);
 }
 
-void PicturePanel::draw_zoom_rect(wxPaintDC &dc)
+void PicturePanel::draw_zoom_rect(wxGCDC &dc)
 {
 	if (zoom_size.IsFullySpecified()) {
 		dc.SetBrush(*wxTRANSPARENT_BRUSH);
@@ -36,14 +39,14 @@ void PicturePanel::draw_zoom_rect(wxPaintDC &dc)
 	}
 }
 
-void PicturePanel::draw_grid(wxPaintDC &dc)
+void PicturePanel::draw_grid(wxGCDC &dc)
 {
 	dc.SetPen(*wxBLACK_PEN);
 	dc.DrawLine(to_pixel({grid.max_grid.x, 0}), to_pixel({grid.min_grid.x, 0}));
 	dc.DrawLine(to_pixel({0, grid.max_grid.y}), to_pixel({0, grid.min_grid.y}));
 }
 
-void PicturePanel::draw_text(wxPaintDC &dc)
+void PicturePanel::draw_text(wxGCDC &dc)
 {
 	for (auto &[p, bmap] : text_map)
 		dc.DrawBitmap(bmap, to_pixel(p), true);
@@ -71,10 +74,13 @@ Point PicturePanel::to_point(wxPoint p)
 	return Point{new_x, new_y};
 }
 
-void PicturePanel::draw_graphs(wxPaintDC &dc)
+void PicturePanel::draw_graphs(wxGCDC &dc)
 {
-	for (auto &pixel_line : pixel_lines)
+	auto i = 0;
+	for (auto &pixel_line : pixel_lines) {
+		dc.SetPen(lines[i++].pen);
 		dc.DrawLines(pixel_line.size(), pixel_line.data());
+	}
 }
 
 void PicturePanel::on_left_up(wxMouseEvent &e)

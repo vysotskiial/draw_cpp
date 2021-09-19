@@ -1,6 +1,7 @@
 #pragma once
 
 #include <wx/wx.h>
+#include <wx/dcgraph.h>
 #include <vector>
 #include <map>
 #include <sstream>
@@ -56,12 +57,13 @@ private:
 	wxSize zoom_size;
 	Grid grid;
 	std::vector<Line> lines;                       // always the same
-	std::vector<std::vector<wxPoint>> pixel_lines; // changes on resize and zoom
+	std::vector<std::vector<wxPoint>> pixel_lines; // changes on resize
+	                                               // and zoom
 
-	void draw_grid(wxPaintDC &);
-	void draw_graphs(wxPaintDC &);
-	void draw_zoom_rect(wxPaintDC &);
-	void draw_text(wxPaintDC &);
+	void draw_grid(wxGCDC &);
+	void draw_graphs(wxGCDC &);
+	void draw_zoom_rect(wxGCDC &);
+	void draw_text(wxGCDC &);
 	void update_lines();
 	void finalize_border();
 	void finalize_ticks();
