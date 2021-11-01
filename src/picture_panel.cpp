@@ -5,7 +5,9 @@
 #include <QChart>
 #include <QBitmap>
 #include <QFileDialog>
+#include <QScreen>
 #include <QObject>
+#include <QApplication>
 #include <klfbackend.h>
 #include <qnamespace.h>
 
@@ -32,7 +34,7 @@ void PicturePanel::paintEvent(QPaintEvent *e)
 		auto painter = QPainter(viewport());
 		painter.drawPixmap(0, 0, cached_graph);
 		painter.setPen(Qt::PenStyle::DashLine);
-		painter.drawRect({QPointF(zoom_start), zoom_end});
+		painter.drawRect(QRect{zoom_start, zoom_end});
 		return;
 	}
 
@@ -49,7 +51,8 @@ void PicturePanel::mousePressEvent(QMouseEvent *e)
 {
 	if (e->button() == Qt::MouseButton::LeftButton) {
 		zoom_start = e->pos();
-		cached_graph = grab();
+		auto screen = QApplication::primaryScreen();
+		cached_graph = screen->grabWindow(winId());
 		mouse_pressed = true;
 		have_cache = true;
 	}
@@ -59,7 +62,7 @@ void PicturePanel::mouseReleaseEvent(QMouseEvent *e)
 {
 	if (e->button() == Qt::MouseButton::LeftButton) {
 		mouse_pressed = false;
-		chart()->zoomIn({zoom_start, zoom_end});
+		chart()->zoomIn(QRectF{zoom_start, zoom_end}.normalized());
 		viewport()->update();
 	}
 }
