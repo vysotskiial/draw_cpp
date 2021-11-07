@@ -8,54 +8,53 @@
 #include <klfbackend.h>
 
 class MainWindow;
-class ControlPanel;
-
-class TextWindow : public QWidget {
-	Q_OBJECT
-	ControlPanel *parent_panel;
-	QTableWidget *table;
-	QPushButton *save_button;
-	QPushButton *add_button;
-	QPushButton *delete_button;
-
-	KLFBackend::klfSettings settings;
-	KLFBackend::klfInput input;
-
-private slots:
-	void on_save();
-
-public:
-	TextWindow(ControlPanel *parent = nullptr);
-};
+constexpr double default_font = 7;
 
 struct Text {
-	double x;
-	double y;
+	QPointF coords;
 	QPixmap pm;
 	QString text;
-	double font;
+	double font{default_font};
 };
 
 class PicturePanel : public QtCharts::QChartView {
 	Q_OBJECT
+
+	bool making_cache{false};
+	QVector<Text> texts;
+
+	bool zoom_mode{true};
+	int text_idx{-1};         // index of text under mouse cursor
+	QPoint mouse_text_offset; // Difference between mouse position when clicked on
+	                          // text and text pixmap top left corner
+
 	bool mouse_pressed{false};
 	QPoint zoom_start;
 	QPoint zoom_end;
 
-	bool have_cache{false};
 	QPixmap cached_graph;
 
-	QPoint chart2widget(QPointF coord);
-	QPointF widget2chart(QPoint coord);
+	// For latex processing
+	KLFBackend::klfSettings settings;
+	KLFBackend::klfInput input;
+
+	QPoint chart2widget(QPointF coord) const;
+	QPointF widget2chart(QPoint coord) const;
+
+	void find_text(QPoint pos); // check if there's latex text under mouse
+
+	QPixmap process_latex();
+	bool input_latex();
 
 public:
-	PicturePanel(MainWindow *parent, QtCharts::QChart *c);
-	QVector<Text> texts;
+	PicturePanel(MainWindow *, QtCharts::QChart *);
+	void switch_zoom() { zoom_mode = !zoom_mode; }
 
 protected:
 	void mouseMoveEvent(QMouseEvent *e) override;
 	void mousePressEvent(QMouseEvent *e) override;
 	void mouseReleaseEvent(QMouseEvent *e) override;
+	void mouseDoubleClickEvent(QMouseEvent *e) override;
 	void paintEvent(QPaintEvent *) override;
 };
 

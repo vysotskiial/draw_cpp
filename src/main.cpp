@@ -12,7 +12,7 @@ using namespace QtCharts;
 using namespace std;
 using Sec = chrono::duration<double>;
 
-constexpr double xi = 1.;
+constexpr double xi = 1.7;
 constexpr double mu = 2.;
 
 Vector<2> right_part(const Vector<2> &x)
