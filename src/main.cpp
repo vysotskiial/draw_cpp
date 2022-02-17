@@ -12,13 +12,14 @@ using namespace QtCharts;
 using namespace std;
 using Sec = chrono::duration<double>;
 
-constexpr double xi = 1.7;
-constexpr double mu = 2.;
+constexpr double xi = 1.;
+constexpr double mu = 4.5;
+constexpr double k = 1.;
 
-Vector<2> right_part(const Vector<2> &x)
+Vector<2> right_part(const Vector<2> &x, double power)
 {
 	Vector<2> res;
-	res[0] = x[1] - copysign(1., x[0]) * sqrt(abs(x[0]));
+	res[0] = x[1] - k * copysign(1., x[0]) * pow(abs(x[0]), power);
 	res[1] = xi * copysign(1., res[0]) - mu * copysign(1., x[0]);
 	return res;
 }
@@ -26,7 +27,8 @@ Vector<2> right_part(const Vector<2> &x)
 int main(int argc, char *argv[])
 {
 	QApplication app(argc, argv);
-	EulerSolver<2> solver(0.001, 100000, {0, 5}, std::function(right_part));
+	auto r_part = [](const Vector<2> &x) { return right_part(x, 0.3); };
+	EulerSolver<2> solver(0.001, 100000, {3, -3}, r_part);
 	auto solution = solver.solve();
 	auto chart = new QChart();
 	chart->legend()->hide();

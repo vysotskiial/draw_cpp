@@ -45,8 +45,9 @@ void PicturePanel::paintEvent(QPaintEvent *e)
 	}
 
 	QPainter painter(viewport());
-	if (mouse_pressed)
+	if (mouse_pressed) {
 		painter.drawPixmap(0, 0, cached_graph);
+	}
 
 	for (auto &text : texts) {
 		auto coords = chart2widget({text.coords});
@@ -170,12 +171,8 @@ bool PicturePanel::input_latex()
 
 void PicturePanel::mouseReleaseEvent(QMouseEvent *e)
 {
-	if (e->button() != Qt::LeftButton && e->button() != Qt::RightButton)
+	if (e->button() != Qt::LeftButton)
 		return;
-
-	if (e->button() == Qt::RightButton) {
-		return;
-	}
 
 	mouse_pressed = false;
 
