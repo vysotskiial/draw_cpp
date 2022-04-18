@@ -13,7 +13,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_library(drawing src/picture_panel.cpp src/control_panel.cpp include/widgets.h)
+add_library(drawing src/picture_panel.cpp src/control_panel.cpp include/widgets.h src/main_window.cpp)
 add_executable(example src/main.cpp)
 
 target_include_directories(drawing PUBLIC include /usr/include/klftools /usr/include/klfbackend)

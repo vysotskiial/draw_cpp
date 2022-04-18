@@ -5,6 +5,7 @@
 #include <QGraphicsItem>
 #include <QTableWidget>
 #include <QtCharts/QChartView>
+#include <QGridLayout>
 #include <klfbackend.h>
 
 class MainWindow;
@@ -20,6 +21,7 @@ struct Text {
 class PicturePanel : public QtCharts::QChartView {
 	Q_OBJECT
 
+	MainWindow *mw;
 	bool making_cache{false};
 	QVector<Text> texts;
 
@@ -47,8 +49,9 @@ class PicturePanel : public QtCharts::QChartView {
 	bool input_latex();
 
 public:
-	PicturePanel(MainWindow *, QtCharts::QChart *);
-	void switch_zoom() { zoom_mode = !zoom_mode; }
+	bool in_grid;
+	PicturePanel(MainWindow *, QtCharts::QChart *, bool _in_grid = false);
+	bool switch_zoom() { return zoom_mode = !zoom_mode; }
 
 protected:
 	void mouseMoveEvent(QMouseEvent *e) override;
@@ -61,6 +64,7 @@ protected:
 class ControlPanel : public QWidget {
 	Q_OBJECT
 	QPushButton *save_button;
+	QPushButton *grid_button;
 	QPushButton *text_button;
 	QPushButton *unzoom_button;
 
@@ -68,6 +72,7 @@ private slots:
 	void on_save();
 	void on_text();
 	void on_unzoom();
+	void on_grid();
 
 public:
 	ControlPanel(QWidget *parent = nullptr);
@@ -79,7 +84,11 @@ class MainWindow : public QWidget {
 
 public:
 	ControlPanel *control_panel;
-	PicturePanel *picture_panel;
-	MainWindow(QWidget *parent, QtCharts::QChart *c);
+	QVector<PicturePanel *> picture_panels;
+	int picture_idx{-1};
+	QGridLayout *pics_layout;
+	void fill_grid();
+	void to_grid();
+	void from_grid(PicturePanel *choice);
+	MainWindow(QWidget *parent, QVector<QtCharts::QChart *> c);
 };
-
