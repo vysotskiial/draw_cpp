@@ -13,8 +13,8 @@ using namespace std;
 using Sec = chrono::duration<double>;
 
 constexpr double xi = 1.;
-constexpr double mu = 4.5;
-constexpr double k = 1.;
+constexpr double mu = 2.5;
+constexpr double k = 10.;
 
 Vector<2> right_part(const Vector<2> &x, double power)
 {
@@ -24,11 +24,16 @@ Vector<2> right_part(const Vector<2> &x, double power)
 	return res;
 }
 
+template<int size>
+QChart *make_chart(const vector<Vector<size>> &vec, int i, int j)
+{
+}
+
 int main(int argc, char *argv[])
 {
 	QApplication app(argc, argv);
-	auto r_part = [](const Vector<2> &x) { return right_part(x, 0.3); };
-	EulerSolver<2> solver(0.001, 100000, {3, -3}, r_part);
+	auto r_part = [](const Vector<2> &x) { return right_part(x, 0.33); };
+	EulerSolver<2> solver(0.001, 100000, {0, 50}, r_part);
 	auto solution = solver.solve();
 	auto chart = new QChart();
 	chart->legend()->hide();
@@ -57,7 +62,25 @@ int main(int argc, char *argv[])
 	x_axis->applyNiceNumbers();
 	y_axis->applyNiceNumbers();
 
-	MainWindow window(nullptr, chart);
+	auto second = new QChart();
+	second->legend()->hide();
+	series = new QSplineSeries();
+	series->append({1, 1});
+	series->append({2, 2});
+	series->append({3, 5});
+	second->addSeries(series);
+	x_axis = new QValueAxis();
+	x_axis->setLinePen(series->pen());
+
+	y_axis = new QValueAxis;
+	y_axis->setLinePen(series->pen());
+
+	second->addAxis(x_axis, Qt::AlignBottom);
+	second->addAxis(y_axis, Qt::AlignLeft);
+	series->attachAxis(x_axis);
+	series->attachAxis(y_axis);
+
+	MainWindow window(nullptr, {chart, second});
 	window.show();
 	return app.exec();
 }

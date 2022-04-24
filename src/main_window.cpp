@@ -1,0 +1,20 @@
+#include <QGridLayout>
+#include <QApplication>
+#include "widgets.h"
+using namespace QtCharts;
+
+MainWindow::MainWindow(QWidget *parent, QVector<QChart *> c)
+{
+	control_panel = new ControlPanel(this);
+	setWindowTitle(tr("Drawing"));
+	auto layout = new QVBoxLayout(this);
+	auto scroll_area = new QScrollArea(this);
+	graph_panel = new GraphChoicePanel(scroll_area, this, c);
+	scroll_area->setWidget(graph_panel);
+	scroll_area->setWidgetResizable(true);
+	// layout->addWidget(graph_panel);
+	layout->addWidget(scroll_area);
+	layout->addWidget(control_panel);
+	setLayout(layout);
+	resize(600 * (1 + (c.size() > 1)), 700);
+}

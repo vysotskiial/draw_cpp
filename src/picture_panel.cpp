@@ -17,11 +17,14 @@
 
 using namespace QtCharts;
 
-PicturePanel::PicturePanel(MainWindow *parent, QChart *c): QChartView(c, parent)
+PicturePanel::PicturePanel(MainWindow *parent, QChart *c,
+                           GraphChoicePanel *c_panel, bool _in_grid)
+  : QChartView(c, c_panel), mw(parent), choice_panel(c_panel), in_grid(_in_grid)
 {
 	setRubberBand(QChartView::RubberBand::NoRubberBand);
 	setRenderHint(QPainter::Antialiasing);
 	setMouseTracking(true);
+	setMinimumSize(500, 500);
 
 	bool ok = KLFBackend::detectSettings(&settings);
 	if (!ok) {
@@ -62,6 +65,9 @@ void PicturePanel::paintEvent(QPaintEvent *e)
 
 void PicturePanel::mousePressEvent(QMouseEvent *e)
 {
+	if (in_grid)
+		return;
+
 	if (e->button() != Qt::LeftButton)
 		return;
 
@@ -97,6 +103,9 @@ void PicturePanel::find_text(QPoint pos)
 
 void PicturePanel::mouseDoubleClickEvent(QMouseEvent *e)
 {
+	if (in_grid)
+		return;
+
 	if (zoom_mode)
 		return;
 
@@ -174,6 +183,11 @@ void PicturePanel::mouseReleaseEvent(QMouseEvent *e)
 	if (e->button() != Qt::LeftButton)
 		return;
 
+	if (in_grid) {
+		choice_panel->from_grid(this);
+		return;
+	}
+
 	mouse_pressed = false;
 
 	if (zoom_mode) {
@@ -194,8 +208,9 @@ void PicturePanel::mouseReleaseEvent(QMouseEvent *e)
 
 void PicturePanel::mouseMoveEvent(QMouseEvent *e)
 {
+	if (in_grid)
+		return;
 	auto coords = widget2chart(e->pos());
-	auto mw = (MainWindow *)parent();
 	mw->control_panel->coords_text->setText(QString::number(coords.x(), 'g', 4) +
 	                                        ';' +
 	                                        QString::number(coords.y(), 'g', 4));
@@ -220,16 +235,4 @@ QPoint PicturePanel::chart2widget(QPointF coord) const
 {
 	auto float_point = chart()->mapToPosition(coord);
 	return QPoint(float_point.x(), float_point.y());
-}
-
-MainWindow::MainWindow(QWidget *parent, QChart *c)
-{
-	control_panel = new ControlPanel(this);
-	picture_panel = new PicturePanel(this, c);
-	setWindowTitle(tr("Drawing"));
-	auto layout = new QVBoxLayout(this);
-	layout->addWidget(picture_panel, 1);
-	layout->addWidget(control_panel);
-	setLayout(layout);
-	resize(700, 700);
 }

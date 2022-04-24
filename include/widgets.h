@@ -5,9 +5,14 @@
 #include <QGraphicsItem>
 #include <QTableWidget>
 #include <QtCharts/QChartView>
+#include <QGridLayout>
+#include <optional>
 #include <klfbackend.h>
+#include <qchartview.h>
 
 class MainWindow;
+class PicturePanel;
+
 constexpr double default_font = 7;
 
 struct Text {
@@ -17,9 +22,30 @@ struct Text {
 	double font{default_font};
 };
 
+class GraphChoicePanel : public QWidget {
+	Q_OBJECT
+	MainWindow *mw;
+	QVector<PicturePanel *> pictures;
+	std::optional<int> picture_idx; // Index of chosen panel
+	QGridLayout *grid_layout;
+
+	void fill_grid();
+
+public:
+	GraphChoicePanel(QWidget *parent, MainWindow *mw,
+	                 QVector<QtCharts::QChart *> charts);
+	void save_widget(QString filename);
+	void from_grid(PicturePanel *panel);
+	bool zoom_text_switch();
+	void reset_zoom();
+	void to_grid();
+};
+
 class PicturePanel : public QtCharts::QChartView {
 	Q_OBJECT
 
+	MainWindow *mw;
+	GraphChoicePanel *choice_panel;
 	bool making_cache{false};
 	QVector<Text> texts;
 
@@ -47,8 +73,10 @@ class PicturePanel : public QtCharts::QChartView {
 	bool input_latex();
 
 public:
-	PicturePanel(MainWindow *, QtCharts::QChart *);
-	void switch_zoom() { zoom_mode = !zoom_mode; }
+	bool in_grid;
+	PicturePanel(MainWindow *, QtCharts::QChart *, GraphChoicePanel *,
+	             bool _in_grid = false);
+	bool switch_zoom() { return zoom_mode = !zoom_mode; }
 
 protected:
 	void mouseMoveEvent(QMouseEvent *e) override;
@@ -61,6 +89,7 @@ protected:
 class ControlPanel : public QWidget {
 	Q_OBJECT
 	QPushButton *save_button;
+	QPushButton *grid_button;
 	QPushButton *text_button;
 	QPushButton *unzoom_button;
 
@@ -68,6 +97,7 @@ private slots:
 	void on_save();
 	void on_text();
 	void on_unzoom();
+	void on_grid();
 
 public:
 	ControlPanel(QWidget *parent = nullptr);
@@ -79,7 +109,6 @@ class MainWindow : public QWidget {
 
 public:
 	ControlPanel *control_panel;
-	PicturePanel *picture_panel;
-	MainWindow(QWidget *parent, QtCharts::QChart *c);
+	GraphChoicePanel *graph_panel;
+	MainWindow(QWidget *parent, QVector<QtCharts::QChart *> c);
 };
-
