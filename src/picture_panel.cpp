@@ -17,12 +17,14 @@
 
 using namespace QtCharts;
 
-PicturePanel::PicturePanel(MainWindow *parent, QChart *c, bool _in_grid)
-  : QChartView(c, parent), in_grid(_in_grid)
+PicturePanel::PicturePanel(MainWindow *parent, QChart *c,
+                           GraphChoicePanel *c_panel, bool _in_grid)
+  : QChartView(c, c_panel), mw(parent), choice_panel(c_panel), in_grid(_in_grid)
 {
 	setRubberBand(QChartView::RubberBand::NoRubberBand);
 	setRenderHint(QPainter::Antialiasing);
 	setMouseTracking(true);
+	setMinimumSize(500, 500);
 
 	bool ok = KLFBackend::detectSettings(&settings);
 	if (!ok) {
@@ -182,8 +184,7 @@ void PicturePanel::mouseReleaseEvent(QMouseEvent *e)
 		return;
 
 	if (in_grid) {
-		auto mw = (MainWindow *)parent();
-		mw->from_grid(this);
+		choice_panel->from_grid(this);
 		return;
 	}
 
@@ -210,7 +211,6 @@ void PicturePanel::mouseMoveEvent(QMouseEvent *e)
 	if (in_grid)
 		return;
 	auto coords = widget2chart(e->pos());
-	auto mw = (MainWindow *)parent();
 	mw->control_panel->coords_text->setText(QString::number(coords.x(), 'g', 4) +
 	                                        ';' +
 	                                        QString::number(coords.y(), 'g', 4));

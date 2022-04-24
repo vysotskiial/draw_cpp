@@ -6,9 +6,13 @@
 #include <QTableWidget>
 #include <QtCharts/QChartView>
 #include <QGridLayout>
+#include <optional>
 #include <klfbackend.h>
+#include <qchartview.h>
 
 class MainWindow;
+class PicturePanel;
+
 constexpr double default_font = 7;
 
 struct Text {
@@ -18,10 +22,30 @@ struct Text {
 	double font{default_font};
 };
 
+class GraphChoicePanel : public QWidget {
+	Q_OBJECT
+	MainWindow *mw;
+	QVector<PicturePanel *> pictures;
+	std::optional<int> picture_idx; // Index of chosen panel
+	QGridLayout *grid_layout;
+
+	void fill_grid();
+
+public:
+	GraphChoicePanel(QWidget *parent, MainWindow *mw,
+	                 QVector<QtCharts::QChart *> charts);
+	void save_widget(QString filename);
+	void from_grid(PicturePanel *panel);
+	bool zoom_text_switch();
+	void reset_zoom();
+	void to_grid();
+};
+
 class PicturePanel : public QtCharts::QChartView {
 	Q_OBJECT
 
 	MainWindow *mw;
+	GraphChoicePanel *choice_panel;
 	bool making_cache{false};
 	QVector<Text> texts;
 
@@ -50,7 +74,8 @@ class PicturePanel : public QtCharts::QChartView {
 
 public:
 	bool in_grid;
-	PicturePanel(MainWindow *, QtCharts::QChart *, bool _in_grid = false);
+	PicturePanel(MainWindow *, QtCharts::QChart *, GraphChoicePanel *,
+	             bool _in_grid = false);
 	bool switch_zoom() { return zoom_mode = !zoom_mode; }
 
 protected:
@@ -84,11 +109,6 @@ class MainWindow : public QWidget {
 
 public:
 	ControlPanel *control_panel;
-	QVector<PicturePanel *> picture_panels;
-	int picture_idx{-1};
-	QGridLayout *pics_layout;
-	void fill_grid();
-	void to_grid();
-	void from_grid(PicturePanel *choice);
+	GraphChoicePanel *graph_panel;
 	MainWindow(QWidget *parent, QVector<QtCharts::QChart *> c);
 };

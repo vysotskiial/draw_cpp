@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 	x_axis->applyNiceNumbers();
 	y_axis->applyNiceNumbers();
 
-	/*auto second = new QChart();
+	auto second = new QChart();
 	second->legend()->hide();
 	series = new QSplineSeries();
 	series->append({1, 1});
@@ -79,9 +79,8 @@ int main(int argc, char *argv[])
 	second->addAxis(y_axis, Qt::AlignLeft);
 	series->attachAxis(x_axis);
 	series->attachAxis(y_axis);
-	*/
 
-	MainWindow window(nullptr, {chart});
+	MainWindow window(nullptr, {chart, second});
 	window.show();
 	return app.exec();
 }
