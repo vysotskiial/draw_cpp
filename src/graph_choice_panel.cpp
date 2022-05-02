@@ -1,9 +1,7 @@
 #include <widgets.h>
 
-using namespace QtCharts;
-
 GraphChoicePanel::GraphChoicePanel(QWidget *parent, MainWindow *main,
-                                   QVector<QChart *> charts)
+                                   QVector<ChartElement> charts)
   : QWidget(parent), mw(main)
 {
 	grid_layout = new QGridLayout();
@@ -89,4 +87,12 @@ void GraphChoicePanel::reset_zoom()
 		return;
 
 	pictures[picture_idx.value()]->chart()->zoomReset();
+}
+
+void GraphChoicePanel::change_graph()
+{
+	if (!picture_idx.has_value())
+		return;
+
+	pictures[picture_idx.value()]->graph_dialog();
 }
