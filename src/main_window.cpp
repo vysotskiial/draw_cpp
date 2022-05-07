@@ -1,9 +1,8 @@
 #include <QGridLayout>
 #include <QApplication>
 #include "widgets.h"
-using namespace QtCharts;
 
-MainWindow::MainWindow(QWidget *parent, QVector<QChart *> c)
+MainWindow::MainWindow(QWidget *parent, QVector<ChartElement> c)
 {
 	control_panel = new ControlPanel(this);
 	setWindowTitle(tr("Drawing"));
@@ -12,7 +11,6 @@ MainWindow::MainWindow(QWidget *parent, QVector<QChart *> c)
 	graph_panel = new GraphChoicePanel(scroll_area, this, c);
 	scroll_area->setWidget(graph_panel);
 	scroll_area->setWidgetResizable(true);
-	// layout->addWidget(graph_panel);
 	layout->addWidget(scroll_area);
 	layout->addWidget(control_panel);
 	setLayout(layout);

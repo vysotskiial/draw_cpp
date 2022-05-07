@@ -6,20 +6,31 @@
 #include <QTableWidget>
 #include <QtCharts/QChartView>
 #include <QGridLayout>
+#include <QDialog>
 #include <optional>
 #include <klfbackend.h>
-#include <qchartview.h>
 
 class MainWindow;
 class PicturePanel;
 
 constexpr double default_font = 7;
 
+QtCharts::QChart *make_chart(const std::vector<std::vector<double>> &vec, int i,
+                             int j, double step = 0.);
+
 struct Text {
 	QPointF coords;
 	QPixmap pm;
 	QString text;
 	double font{default_font};
+};
+
+struct ChartElement {
+	QtCharts::QChart *chart;
+	QString equations{};
+	int x_component{0}; // Our equatoins can be more than 2d
+	int y_component{1}; // so we specify which compoents to plot
+	                    // -1 is to plot against time
 };
 
 class GraphChoicePanel : public QWidget {
@@ -33,12 +44,13 @@ class GraphChoicePanel : public QWidget {
 
 public:
 	GraphChoicePanel(QWidget *parent, MainWindow *mw,
-	                 QVector<QtCharts::QChart *> charts);
+	                 QVector<ChartElement> charts);
 	void save_widget(QString filename);
 	void from_grid(PicturePanel *panel);
 	bool zoom_text_switch();
 	void reset_zoom();
 	void to_grid();
+	void change_graph();
 };
 
 class PicturePanel : public QtCharts::QChartView {
@@ -48,8 +60,9 @@ class PicturePanel : public QtCharts::QChartView {
 	GraphChoicePanel *choice_panel;
 	bool making_cache{false};
 	QVector<Text> texts;
+	ChartElement my_element;
 
-	bool zoom_mode{true};
+	bool zoom_mode{false};
 	int text_idx{-1};         // index of text under mouse cursor
 	QPoint mouse_text_offset; // Difference between mouse position when clicked on
 	                          // text and text pixmap top left corner
@@ -71,12 +84,14 @@ class PicturePanel : public QtCharts::QChartView {
 
 	QPixmap process_latex();
 	bool input_latex();
+	void process_new_equations(QString init, double step, int num);
 
 public:
 	bool in_grid;
-	PicturePanel(MainWindow *, QtCharts::QChart *, GraphChoicePanel *,
+	PicturePanel(MainWindow *, ChartElement, GraphChoicePanel *,
 	             bool _in_grid = false);
 	bool switch_zoom() { return zoom_mode = !zoom_mode; }
+	void graph_dialog();
 
 protected:
 	void mouseMoveEvent(QMouseEvent *e) override;
@@ -90,14 +105,16 @@ class ControlPanel : public QWidget {
 	Q_OBJECT
 	QPushButton *save_button;
 	QPushButton *grid_button;
-	QPushButton *text_button;
+	QPushButton *zoom_button;
 	QPushButton *unzoom_button;
+	QPushButton *graph_button;
 
 private slots:
 	void on_save();
-	void on_text();
+	void on_zoom();
 	void on_unzoom();
 	void on_grid();
+	void on_graph();
 
 public:
 	ControlPanel(QWidget *parent = nullptr);
@@ -110,5 +127,5 @@ class MainWindow : public QWidget {
 public:
 	ControlPanel *control_panel;
 	GraphChoicePanel *graph_panel;
-	MainWindow(QWidget *parent, QVector<QtCharts::QChart *> c);
+	MainWindow(QWidget *parent, QVector<ChartElement> c);
 };
