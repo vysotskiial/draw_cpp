@@ -16,7 +16,7 @@ class PicturePanel;
 constexpr double default_font = 7;
 
 QtCharts::QChart *make_chart(const std::vector<std::vector<double>> &vec, int i,
-                             int j, double step = 0.);
+                             int j, QColor color = Qt::black, double step = 0.);
 
 struct Text {
 	QPointF coords;
@@ -31,6 +31,7 @@ struct ChartElement {
 	int x_component{0}; // Our equatoins can be more than 2d
 	int y_component{1}; // so we specify which compoents to plot
 	                    // -1 is to plot against time
+	QColor color{Qt::black};
 };
 
 class GraphChoicePanel : public QWidget {

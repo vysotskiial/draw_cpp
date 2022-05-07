@@ -13,6 +13,7 @@
 #include <QValueAxis>
 #include <klfbackend.h>
 #include <QApplication>
+#include <QColorDialog>
 #include <QScreen>
 #include "widgets.h"
 #include "solver.h"
@@ -21,7 +22,8 @@
 using namespace std;
 using namespace QtCharts;
 
-QChart *make_chart(const vector<vector<double>> &vec, int i, int j, double step)
+QChart *make_chart(const vector<vector<double>> &vec, int i, int j,
+                   QColor color, double step)
 {
 	auto chart = new QtCharts::QChart();
 	chart->legend()->hide();
@@ -30,6 +32,7 @@ QChart *make_chart(const vector<vector<double>> &vec, int i, int j, double step)
 
 	auto pen = series->pen();
 	pen.setWidth(2);
+	pen.setColor(color);
 	series->setPen(pen);
 
 	auto get_value = [&vec, step](int comp, int k) {
@@ -41,10 +44,10 @@ QChart *make_chart(const vector<vector<double>> &vec, int i, int j, double step)
 	chart->addSeries(series);
 
 	auto x_axis = new QValueAxis();
-	x_axis->setLinePen(series->pen());
+	x_axis->setLinePen(Qt::PenStyle::SolidLine);
 
 	auto y_axis = new QValueAxis;
-	y_axis->setLinePen(series->pen());
+	y_axis->setLinePen(Qt::PenStyle::SolidLine);
 
 	chart->addAxis(x_axis, Qt::AlignBottom);
 	chart->addAxis(y_axis, Qt::AlignLeft);
@@ -209,6 +212,14 @@ void PicturePanel::graph_dialog()
 	comps_layout->addWidget(y_comp_edit);
 	form.addRow("State vector components", comps_layout);
 
+	auto color_button = new QPushButton("Choose color", &dialog);
+	QColor color = Qt::black;
+	auto choose_color = [&color, &dialog]() {
+		color = QColorDialog::getColor(Qt::black, &dialog, "Select color");
+	};
+	connect(color_button, &QPushButton::released, &dialog, choose_color);
+	form.addRow(color_button);
+
 	QDialogButtonBox buttonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
 	                           Qt::Horizontal, &dialog);
 	form.addRow(&buttonBox);
@@ -219,6 +230,7 @@ void PicturePanel::graph_dialog()
 		my_element.equations = text_edit->toPlainText();
 		my_element.x_component = x_comp_edit->value();
 		my_element.y_component = y_comp_edit->value();
+		my_element.color = color;
 		process_new_equations(line_edit->text(), step_edit->value(),
 		                      steps_num_edit->value());
 	}
@@ -234,8 +246,8 @@ void PicturePanel::process_new_equations(QString init, double step, int num)
 	VectorProcessor vp(my_element.equations.toStdString());
 	EulerSolver solver(step, num, init_cond, vp);
 	auto solution = solver.solve();
-	auto chart =
-	  make_chart(solution, my_element.x_component, my_element.y_component, step);
+	auto chart = make_chart(solution, my_element.x_component,
+	                        my_element.y_component, my_element.color, step);
 	delete this->chart();
 	setChart(chart);
 }
