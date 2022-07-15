@@ -31,8 +31,8 @@ public:
 		for (auto i = 1; i <= step_num; i++) {
 			auto next{result.back()};
 			auto deriv = rp(result.back());
-			for (auto i = 0u; i < next.size(); i++) {
-				next[i] += deriv[i] * step;
+			for (auto j = 0u; j < next.size(); j++) {
+				next[j] += deriv[j] * step;
 			}
 			result.push_back(next);
 		}

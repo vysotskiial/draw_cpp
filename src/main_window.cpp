@@ -2,7 +2,9 @@
 #include <QApplication>
 #include "widgets.h"
 
-MainWindow::MainWindow(QWidget *parent, QVector<ChartElement> c)
+MainWindow::MainWindow(QWidget *parent,
+                       const QVector<QVector<SeriesElement>> &c)
+  : QWidget(parent)
 {
 	control_panel = new ControlPanel(this);
 	setWindowTitle(tr("Drawing"));

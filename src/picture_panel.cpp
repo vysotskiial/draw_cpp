@@ -5,10 +5,8 @@
 #include <QChart>
 #include <QBitmap>
 #include <QDialogButtonBox>
-#include <QDoubleSpinBox>
 #include <QFileDialog>
 #include <QInputDialog>
-#include <QTextEdit>
 #include <QSplineSeries>
 #include <QValueAxis>
 #include <klfbackend.h>
@@ -22,12 +20,23 @@
 using namespace std;
 using namespace QtCharts;
 
-QChart *make_chart(const vector<vector<double>> &vec, int i, int j,
-                   QColor color, double step)
+QChart *make_new_chart()
 {
-	auto chart = new QtCharts::QChart();
-	chart->legend()->hide();
+	auto *new_chart = new QChart();
+	new_chart->legend()->hide();
 
+	auto x_axis = new QValueAxis();
+	x_axis->setLinePen(Qt::PenStyle::SolidLine);
+
+	auto y_axis = new QValueAxis;
+	y_axis->setLinePen(Qt::PenStyle::SolidLine);
+
+	return new_chart;
+}
+
+QChart *add_series(QChart *chart, const vector<vector<double>> &vec, int i,
+                   int j, QColor color, double step)
+{
 	auto series = new QSplineSeries();
 
 	auto pen = series->pen();
@@ -43,28 +52,15 @@ QChart *make_chart(const vector<vector<double>> &vec, int i, int j,
 
 	chart->addSeries(series);
 
-	auto x_axis = new QValueAxis();
-	x_axis->setLinePen(Qt::PenStyle::SolidLine);
-
-	auto y_axis = new QValueAxis;
-	y_axis->setLinePen(Qt::PenStyle::SolidLine);
-
-	chart->addAxis(x_axis, Qt::AlignBottom);
-	chart->addAxis(y_axis, Qt::AlignLeft);
-
-	series->attachAxis(x_axis);
-	series->attachAxis(y_axis);
-	x_axis->applyNiceNumbers();
-	y_axis->applyNiceNumbers();
-
 	return chart;
 }
 
-PicturePanel::PicturePanel(MainWindow *parent, ChartElement c,
+PicturePanel::PicturePanel(MainWindow *parent,
+                           const QVector<SeriesElement> &series,
                            GraphChoicePanel *c_panel, bool _in_grid)
-  : QChartView(c.chart, c_panel), mw(parent), choice_panel(c_panel),
-    my_element(c), in_grid(_in_grid)
+  : mw(parent), choice_panel(c_panel), my_elements(series), in_grid(_in_grid)
 {
+	process_new_equations();
 	setRubberBand(QChartView::RubberBand::NoRubberBand);
 	setRenderHint(QPainter::Antialiasing);
 	setMouseTracking(true);
@@ -79,6 +75,8 @@ PicturePanel::PicturePanel(MainWindow *parent, ChartElement c,
 	input.mathmode = "\\begin{equation*} ... \\end{equation*}";
 	input.preamble = "\\usepackage{amsmath}\n";
 	input.dpi = 300;
+
+	chart_dialog = new ChartDialog(series, this);
 }
 
 void PicturePanel::paintEvent(QPaintEvent *e)
@@ -177,79 +175,36 @@ QPixmap PicturePanel::process_latex()
 
 void PicturePanel::graph_dialog()
 {
-	QDialog dialog(this);
-	QFormLayout form(&dialog);
-
-	// Add some text above the fields
-	form.addRow(new QLabel("Input chart"));
-
-	auto text_edit = new QTextEdit(&dialog);
-	text_edit->setPlainText(my_element.equations);
-	text_edit->setLineWrapMode(QTextEdit::NoWrap);
-	form.addRow("Equations", text_edit);
-
-	auto line_edit = new QLineEdit(&dialog);
-	line_edit->setPlaceholderText("Comma separated, e.g. 1,2,3");
-	form.addRow("Initial conditions", line_edit);
-
-	auto step_edit = new QDoubleSpinBox(&dialog);
-	step_edit->setValue(0.001);
-	step_edit->setDecimals(5);
-	auto steps_num_edit = new QSpinBox(&dialog);
-	steps_num_edit->setMaximum(10e8);
-	steps_num_edit->setValue(10000);
-	auto steps_layout = new QHBoxLayout();
-	steps_layout->addWidget(step_edit);
-	steps_layout->addWidget(steps_num_edit);
-	form.addRow("Step and steps number", steps_layout);
-
-	auto x_comp_edit = new QSpinBox(&dialog);
-	x_comp_edit->setMinimum(-1);
-	auto y_comp_edit = new QSpinBox(&dialog);
-	y_comp_edit->setMinimum(-1);
-	auto comps_layout = new QHBoxLayout();
-	comps_layout->addWidget(x_comp_edit);
-	comps_layout->addWidget(y_comp_edit);
-	form.addRow("State vector components", comps_layout);
-
-	auto color_button = new QPushButton("Choose color", &dialog);
-	QColor color = Qt::black;
-	auto choose_color = [&color, &dialog]() {
-		color = QColorDialog::getColor(Qt::black, &dialog, "Select color");
-	};
-	connect(color_button, &QPushButton::released, &dialog, choose_color);
-	form.addRow(color_button);
-
-	QDialogButtonBox buttonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
-	                           Qt::Horizontal, &dialog);
-	form.addRow(&buttonBox);
-	connect(&buttonBox, SIGNAL(accepted()), &dialog, SLOT(accept()));
-	connect(&buttonBox, SIGNAL(rejected()), &dialog, SLOT(reject()));
-
-	if (dialog.exec() == QDialog::Accepted) { // Solve and draw
-		my_element.equations = text_edit->toPlainText();
-		my_element.x_component = x_comp_edit->value();
-		my_element.y_component = y_comp_edit->value();
-		my_element.color = color;
-		process_new_equations(line_edit->text(), step_edit->value(),
-		                      steps_num_edit->value());
+	auto elem = chart_dialog->getElements();
+	if (elem.has_value()) {
+		my_elements = elem.value();
+		process_new_equations();
 	}
 }
 
-void PicturePanel::process_new_equations(QString init, double step, int num)
+void PicturePanel::process_new_equations()
 {
-	auto lst = init.split(",");
-	std::vector<double> init_cond;
-	for (auto x : lst)
-		init_cond.push_back(x.toDouble());
+	auto new_chart = make_new_chart();
+	auto old_chart = this->chart();
 
-	VectorProcessor vp(my_element.equations.toStdString());
-	EulerSolver solver(step, num, init_cond, vp);
-	auto solution = solver.solve();
-	auto chart = make_chart(solution, my_element.x_component,
-	                        my_element.y_component, my_element.color, step);
-	delete this->chart();
-	setChart(chart);
+	for (auto &e : my_elements) {
+		auto lst = e.init_cond.split(",");
+		std::vector<double> init_cond;
+		for (auto x : lst)
+			init_cond.push_back(x.toDouble());
+
+		VectorProcessor vp(e.equations.toStdString());
+		EulerSolver solver(e.step, e.step_num, init_cond, vp);
+		auto solution = solver.solve();
+		add_series(new_chart, solution, e.x_component, e.y_component, e.color,
+		           e.step);
+	}
+	new_chart->createDefaultAxes();
+	for (auto &axis : new_chart->axes()) {
+		((QValueAxis *)axis)->applyNiceNumbers();
+	}
+	setChart(new_chart);
+	delete old_chart;
 }
 
 bool PicturePanel::input_latex()

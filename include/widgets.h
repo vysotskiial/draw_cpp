@@ -5,8 +5,12 @@
 #include <QGraphicsItem>
 #include <QTableWidget>
 #include <QtCharts/QChartView>
+#include <QSplineSeries>
 #include <QGridLayout>
 #include <QDialog>
+#include <QTextEdit>
+#include <QLineEdit>
+#include <QSpinBox>
 #include <optional>
 #include <klfbackend.h>
 
@@ -15,9 +19,6 @@ class PicturePanel;
 
 constexpr double default_font = 7;
 
-QtCharts::QChart *make_chart(const std::vector<std::vector<double>> &vec, int i,
-                             int j, QColor color = Qt::black, double step = 0.);
-
 struct Text {
 	QPointF coords;
 	QPixmap pm;
@@ -25,13 +26,44 @@ struct Text {
 	double font{default_font};
 };
 
-struct ChartElement {
-	QtCharts::QChart *chart;
-	QString equations{};
+struct SeriesElement {
+	QString equations;
+	QString init_cond;
 	int x_component{0}; // Our equatoins can be more than 2d
 	int y_component{1}; // so we specify which compoents to plot
 	                    // -1 is to plot against time
 	QColor color{Qt::black};
+	double step{0.001};
+	int step_num{10000};
+};
+
+class ChartDialogTab : public QWidget {
+	Q_OBJECT
+public:
+	QPushButton *color_button;
+	QTextEdit *equations_edit;
+	QLineEdit *init_edit;
+	QDoubleSpinBox *step_edit;
+	QSpinBox *steps_num_edit;
+	QSpinBox *x_comp_edit;
+	QSpinBox *y_comp_edit;
+	QColor color;
+
+	ChartDialogTab(const SeriesElement &e, QWidget *p);
+};
+
+class ChartDialog : public QDialog {
+private:
+	QTabWidget *tabs;
+	QPushButton *add_button;
+	QPushButton *remove_button;
+
+	void on_remove();
+	void on_add();
+
+public:
+	std::optional<QVector<SeriesElement>> getElements();
+	ChartDialog(const QVector<SeriesElement> &e, QWidget *p);
 };
 
 class GraphChoicePanel : public QWidget {
@@ -45,7 +77,7 @@ class GraphChoicePanel : public QWidget {
 
 public:
 	GraphChoicePanel(QWidget *parent, MainWindow *mw,
-	                 QVector<ChartElement> charts);
+	                 QVector<QVector<SeriesElement>> charts);
 	void save_widget(QString filename);
 	void from_grid(PicturePanel *panel);
 	bool zoom_text_switch();
@@ -61,7 +93,7 @@ class PicturePanel : public QtCharts::QChartView {
 	GraphChoicePanel *choice_panel;
 	bool making_cache{false};
 	QVector<Text> texts;
-	ChartElement my_element;
+	QVector<SeriesElement> my_elements;
 
 	bool zoom_mode{false};
 	int text_idx{-1};         // index of text under mouse cursor
@@ -78,6 +110,8 @@ class PicturePanel : public QtCharts::QChartView {
 	KLFBackend::klfSettings settings;
 	KLFBackend::klfInput input;
 
+	ChartDialog *chart_dialog;
+
 	QPoint chart2widget(QPointF coord) const;
 	QPointF widget2chart(QPoint coord) const;
 
@@ -85,11 +119,11 @@ class PicturePanel : public QtCharts::QChartView {
 
 	QPixmap process_latex();
 	bool input_latex();
-	void process_new_equations(QString init, double step, int num);
+	void process_new_equations();
 
 public:
 	bool in_grid;
-	PicturePanel(MainWindow *, ChartElement, GraphChoicePanel *,
+	PicturePanel(MainWindow *, const QVector<SeriesElement> &, GraphChoicePanel *,
 	             bool _in_grid = false);
 	bool switch_zoom() { return zoom_mode = !zoom_mode; }
 	void graph_dialog();
@@ -128,5 +162,5 @@ class MainWindow : public QWidget {
 public:
 	ControlPanel *control_panel;
 	GraphChoicePanel *graph_panel;
-	MainWindow(QWidget *parent, QVector<ChartElement> c);
+	MainWindow(QWidget *parent, const QVector<QVector<SeriesElement>> &charts);
 };

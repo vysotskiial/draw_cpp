@@ -195,8 +195,8 @@ VectorProcessor::VectorProcessor(const string &str)
 	if (lines.back() == "")
 		lines.pop_back();
 
-	size_t eq_num = count_if(lines.begin(), lines.end(), [](const string &str) {
-		return !str.starts_with(default_aux_variable);
+	size_t eq_num = count_if(lines.begin(), lines.end(), [](const string &s) {
+		return !s.starts_with(default_aux_variable);
 	});
 
 	for (auto &line : lines) {

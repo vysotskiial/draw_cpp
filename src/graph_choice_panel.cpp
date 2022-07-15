@@ -1,7 +1,7 @@
 #include <widgets.h>
 
 GraphChoicePanel::GraphChoicePanel(QWidget *parent, MainWindow *main,
-                                   QVector<ChartElement> charts)
+                                   QVector<QVector<SeriesElement>> charts)
   : QWidget(parent), mw(main)
 {
 	grid_layout = new QGridLayout();
