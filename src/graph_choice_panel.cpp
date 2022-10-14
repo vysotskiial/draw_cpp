@@ -1,12 +1,18 @@
 #include <widgets.h>
 
 GraphChoicePanel::GraphChoicePanel(QWidget *parent, MainWindow *main,
-                                   QVector<ChartElement> charts)
+                                   const QVector<SeriesVec> &base,
+                                   const QVector<FormulasVec> &charts)
   : QWidget(parent), mw(main)
 {
 	grid_layout = new QGridLayout();
+	if (base.size() && base.size() != charts.size()) {
+		throw(std::runtime_error("Baselines vector and formulas vector should be "
+		                         "of the same size"));
+	}
 	for (auto i = 0; i < charts.size(); i++) {
-		auto picture = new PicturePanel(mw, charts[i], this, charts.size() > 1);
+		auto picture = new PicturePanel(mw, base.size() ? base[i] : SeriesVec(),
+		                                charts[i], this, charts.size() > 1);
 		pictures.append(picture);
 	}
 

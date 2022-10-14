@@ -12,18 +12,23 @@ using Sec = chrono::duration<double>;
 
 constexpr double xi = 1.;
 constexpr double mu = 2.5;
-constexpr double k = 10.;
+[[maybe_unused]] constexpr double k = 1.;
+constexpr double Delta = 1.;
+constexpr double Epsilon = 0.0001;
 
 int sign(double x)
 {
-	return (x > 0) ? 1 : -1;
+	auto result = (x > 0) ? 1 : -1;
+	return result;
 }
 
 vector<double> rp(const vector<double> x, double power)
 {
 	vector<double> res{0, 0};
-	res[0] = x[1] - k * sign(x[0]) * pow(abs(x[0]), power);
-	res[1] = xi * sign(res[0]) - mu * copysign(1., x[0]);
+	auto delta =
+	  (abs(x[0]) < Delta) ? -x[0] - Epsilon * sign(x[0]) : -Delta * sign(x[0]);
+	res[0] = x[1] - sign(x[0] + delta) * pow(abs(x[0] + delta), power);
+	res[1] = xi * sign(res[0]) - mu * sign(x[0] + delta);
 	return res;
 }
 
@@ -31,30 +36,22 @@ int main(int argc, char *argv[])
 {
 	QApplication app(argc, argv);
 	auto r_part = [](const vector<double> &x) { return rp(x, 0.5); };
-	EulerSolver solver(0.001, 100000, {0, 45}, r_part);
-	auto start = chrono::high_resolution_clock::now();
+	EulerSolver solver(0.001, 10000, {0, 15}, r_part);
 	auto solution = solver.solve();
-	auto stop = chrono::high_resolution_clock::now();
-
-	cout << "Modeling with cpp function took "
-	     << chrono::duration_cast<Sec>(stop - start).count() << '\n';
-
-	auto chart = make_chart(solution, 0, 1);
+	auto series = new QSplineSeries();
+	auto pen = series->pen();
+	pen.setWidth(2);
+	pen.setColor("red");
+	series->setPen(pen);
+	for (auto i = 0; i < 10000; i++) {
+		series->append({solution[i][0], solution[i][1]});
+	}
 
 	auto eq = "v1 = x2 - 10*sign(x1)*pow(abs(x1), 0.5)\n"
 	          "v1\n"
 	          "sign(v1) - 2.5 * sign(x1)\n";
-	VectorProcessor vp(eq);
-	EulerSolver solver2(0.001, 100000, {0, 45}, vp);
-	start = chrono::high_resolution_clock::now();
-	auto solution2 = solver2.solve();
-	stop = chrono::high_resolution_clock::now();
-	cout << "Modeling with fancy shmancy symbolic function took "
-	     << chrono::duration_cast<Sec>(stop - start).count() << '\n';
 
-	auto second = make_chart(solution2, 0, 1);
-
-	MainWindow window(nullptr, {{chart}, {second, eq}});
+	MainWindow window(nullptr, {{series}}, {{{eq, "0, 35"}}});
 	window.show();
 	return app.exec();
 }
