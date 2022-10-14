@@ -25,17 +25,18 @@ struct SingleOperation {
 	// Indexes in operands vector
 	std::vector<size_t> operand_indexes;
 	size_t result_idx;
+	std::string aux_var_name;
 	double num{0}; // Just for opNumber
 };
 
 constexpr char default_variable = 'x';
-constexpr char default_aux_variable = 'v';
 
 class VectorProcessor;
 
 class FormulaProcessor {
 private:
 	VectorProcessor *owner;
+	int state_size;
 	char variable{default_variable};
 	std::vector<SingleOperation> operations;
 	std::vector<double> operands;
@@ -53,7 +54,7 @@ private:
 
 public:
 	void set_owner(VectorProcessor *o) { owner = o; }
-	FormulaProcessor(const std::string &formula, size_t args_num,
+	FormulaProcessor(const std::string &formula, int args_num,
 	                 VectorProcessor *o = nullptr);
 	FormulaProcessor() {}
 	double operator()(const std::vector<double> &);
@@ -61,11 +62,13 @@ public:
 
 class VectorProcessor {
 private:
+	int state_size;
 	std::vector<FormulaProcessor> components;
-	std::map<int, FormulaProcessor> variable_formulas;
+	std::map<std::string, FormulaProcessor> aux_variables;
 
 public:
-	std::map<int, double> variables; // Auxilliary stuff
+	bool is_aux_var(const std::string &name) { return aux_variables.count(name); }
+	std::map<std::string, double> variables; // Auxilliary stuff
 	std::vector<double> operator()(const std::vector<double> &);
 	VectorProcessor(const std::string &str);
 	VectorProcessor(const VectorProcessor &other);

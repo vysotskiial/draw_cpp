@@ -1,7 +1,9 @@
 #include <QFormLayout>
 #include <QColorDialog>
 #include <QDialogButtonBox>
+#include <QMessageBox>
 #include "widgets.h"
+#include "formula_processor.h"
 
 ChartDialogTab::ChartDialogTab(const FormulaElement &e, QWidget *parent)
   : QWidget(parent)
@@ -66,6 +68,17 @@ std::optional<FormulasVec> ChartDialog::getElements()
 		FormulaElement element;
 		auto tab = dynamic_cast<ChartDialogTab *>(tabs->widget(i));
 		element.equations = tab->equations_edit->toPlainText();
+		try {
+			VectorProcessor vp(element.equations.toStdString());
+		}
+		catch (std::invalid_argument &e) {
+			QMessageBox::warning(this, "Equation error", "Wrong equation format");
+			return {};
+		}
+		catch (std::exception &e) {
+			QMessageBox::warning(this, "Equation error", e.what());
+			return {};
+		}
 		element.x_component = tab->x_comp_edit->value();
 		element.y_component = tab->y_comp_edit->value();
 		element.color = tab->color;

@@ -7,9 +7,9 @@
 
 using namespace std;
 
-FormulaProcessor::FormulaProcessor(const string &f, size_t args_num,
+FormulaProcessor::FormulaProcessor(const string &f, int args_num,
                                    VectorProcessor *o)
-  : owner(o)
+  : owner(o), state_size(args_num)
 {
 	auto formula = f;
 	formula.erase(remove(formula.begin(), formula.end(), ' '), formula.end());
@@ -102,6 +102,8 @@ void FormulaProcessor::parse_formula(const std::string &formula)
 
 	if (formula.starts_with(variable)) {
 		auto idx = stoi(formula.substr(1));
+		if (idx > state_size)
+			throw runtime_error("State component outside of range used");
 		operands.push_back(0);
 		SingleOperation op;
 		op.type = OperationType::opVariable;
@@ -111,23 +113,22 @@ void FormulaProcessor::parse_formula(const std::string &formula)
 		return;
 	}
 
-	if (formula.starts_with(default_aux_variable)) {
-		auto idx = stoi(formula.substr(1));
+	if (owner && owner->is_aux_var(formula)) {
 		operands.push_back(0);
 		SingleOperation op;
 		op.type = OperationType::opAuxVariable;
-		op.operand_indexes.push_back(idx);
 		op.result_idx = operands.size() - 1;
+		op.aux_var_name = formula;
 		operations.push_back(op);
 		return;
 	}
 
 	// Should be just a number.
 	operands.push_back(0);
-	SingleOperation op{OperationType::opNumber,
-	                   {},
-	                   operands.size() - 1,
-	                   stod(formula)};
+	SingleOperation op;
+	op.type = OperationType::opNumber;
+	op.result_idx = operands.size() - 1;
+	op.num = stod(formula);
 	operations.push_back(op);
 }
 
@@ -174,7 +175,7 @@ double FormulaProcessor::operator()(const vector<double> &args)
 			operands[op.result_idx] = op.num;
 			break;
 		case OperationType::opAuxVariable:
-			operands[op.result_idx] = owner->variables.at(op.operand_indexes[0]);
+			operands[op.result_idx] = owner->variables.at(op.aux_var_name);
 			break;
 		}
 		// cout << operands[op.result_idx] << '\n';
@@ -195,23 +196,27 @@ VectorProcessor::VectorProcessor(const string &str)
 	if (lines.back() == "")
 		lines.pop_back();
 
-	size_t eq_num = count_if(lines.begin(), lines.end(), [](const string &s) {
-		return !s.starts_with(default_aux_variable);
+	state_size = count_if(lines.begin(), lines.end(), [](const std::string &l) {
+		return l.find("=") == string::npos;
 	});
+	if (!state_size)
+		throw runtime_error("No state equations provided");
 
 	for (auto &line : lines) {
 		auto formula = line;
 		formula.erase(remove(formula.begin(), formula.end(), ' '), formula.end());
-		if (formula.starts_with(default_aux_variable)) {
-			auto pos = formula.find("=");
-			if (pos != string::npos) {
-				auto v_num = formula.substr(1, pos - 1);
-				variable_formulas[stoi(v_num)] = {formula.substr(pos + 1), eq_num,
-				                                  this};
-				continue;
-			}
+		auto pos = formula.find("=");
+		if (pos != string::npos) { // auxilliary variable definition
+			auto var_name = formula.substr(0, pos);
+			if (!isalpha(var_name[0]))
+				throw runtime_error("Variable name is not an identifier"s + var_name);
+			if (aux_variables.count(var_name))
+				throw runtime_error("Variable is defined twice"s + var_name);
+			aux_variables[var_name] = {formula.substr(pos + 1), state_size, this};
 		}
-		components.push_back({formula, eq_num, this});
+		else {
+			components.push_back({formula, state_size, this});
+		}
 	}
 }
 
@@ -222,17 +227,17 @@ VectorProcessor::VectorProcessor(const VectorProcessor &other)
 		components.back().set_owner(this);
 	}
 
-	for (auto &[idx, var_form] : other.variable_formulas) {
-		variable_formulas[idx] = var_form;
-		variable_formulas[idx].set_owner(this);
+	for (auto &[name, var_form] : other.aux_variables) {
+		aux_variables[name] = var_form;
+		aux_variables[name].set_owner(this);
 	}
 }
 
 vector<double> VectorProcessor::operator()(const vector<double> &args)
 {
 	vector<double> result;
-	for (auto &[idx, aux_proc] : variable_formulas) {
-		variables[idx] = aux_proc(args);
+	for (auto &[name, aux_proc] : aux_variables) {
+		variables[name] = aux_proc(args);
 	}
 
 	for (auto &component : components) {
