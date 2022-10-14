@@ -3,7 +3,7 @@
 #include <QDialogButtonBox>
 #include "widgets.h"
 
-ChartDialogTab::ChartDialogTab(const SeriesElement &e, QWidget *parent)
+ChartDialogTab::ChartDialogTab(const FormulaElement &e, QWidget *parent)
   : QWidget(parent)
 {
 	auto form = new QFormLayout(this);
@@ -56,14 +56,14 @@ ChartDialogTab::ChartDialogTab(const SeriesElement &e, QWidget *parent)
 	form->addRow(color_button);
 }
 
-std::optional<QVector<SeriesElement>> ChartDialog::getElements()
+std::optional<FormulasVec> ChartDialog::getElements()
 {
 	if (exec() != QDialog::Accepted) {
 		return {};
 	}
-	QVector<SeriesElement> elements;
+	FormulasVec elements;
 	for (auto i = 0; i < tabs->count(); i++) {
-		SeriesElement element;
+		FormulaElement element;
 		auto tab = dynamic_cast<ChartDialogTab *>(tabs->widget(i));
 		element.equations = tab->equations_edit->toPlainText();
 		element.x_component = tab->x_comp_edit->value();
@@ -77,8 +77,7 @@ std::optional<QVector<SeriesElement>> ChartDialog::getElements()
 	return elements;
 }
 
-ChartDialog::ChartDialog(const QVector<SeriesElement> &elements, QWidget *p)
-  : QDialog(p)
+ChartDialog::ChartDialog(const FormulasVec &elements, QWidget *p): QDialog(p)
 {
 	auto form = new QFormLayout(this);
 	tabs = new QTabWidget(this);

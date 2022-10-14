@@ -26,7 +26,7 @@ struct Text {
 	double font{default_font};
 };
 
-struct SeriesElement {
+struct FormulaElement {
 	QString equations;
 	QString init_cond;
 	int x_component{0}; // Our equatoins can be more than 2d
@@ -36,6 +36,9 @@ struct SeriesElement {
 	double step{0.001};
 	int step_num{10000};
 };
+
+using FormulasVec = QVector<FormulaElement>;
+using SeriesVec = QVector<QtCharts::QAbstractSeries *>;
 
 class ChartDialogTab : public QWidget {
 	Q_OBJECT
@@ -49,7 +52,7 @@ public:
 	QSpinBox *y_comp_edit;
 	QColor color;
 
-	ChartDialogTab(const SeriesElement &e, QWidget *p);
+	ChartDialogTab(const FormulaElement &e, QWidget *p);
 };
 
 class ChartDialog : public QDialog {
@@ -62,8 +65,8 @@ private:
 	void on_add();
 
 public:
-	std::optional<QVector<SeriesElement>> getElements();
-	ChartDialog(const QVector<SeriesElement> &e, QWidget *p);
+	std::optional<FormulasVec> getElements();
+	ChartDialog(const FormulasVec &e, QWidget *p);
 };
 
 class GraphChoicePanel : public QWidget {
@@ -77,7 +80,8 @@ class GraphChoicePanel : public QWidget {
 
 public:
 	GraphChoicePanel(QWidget *parent, MainWindow *mw,
-	                 QVector<QVector<SeriesElement>> charts);
+	                 const QVector<SeriesVec> &baselines,
+	                 const QVector<FormulasVec> &charts);
 	void save_widget(QString filename);
 	void from_grid(PicturePanel *panel);
 	bool zoom_text_switch();
@@ -92,8 +96,10 @@ class PicturePanel : public QtCharts::QChartView {
 	MainWindow *mw;
 	GraphChoicePanel *choice_panel;
 	bool making_cache{false};
+	SeriesVec baseline; // Series provided not through
+	                    // formulas
 	QVector<Text> texts;
-	QVector<SeriesElement> my_elements;
+	FormulasVec my_elements;
 
 	bool zoom_mode{false};
 	int text_idx{-1};         // index of text under mouse cursor
@@ -123,8 +129,8 @@ class PicturePanel : public QtCharts::QChartView {
 
 public:
 	bool in_grid;
-	PicturePanel(MainWindow *, const QVector<SeriesElement> &, GraphChoicePanel *,
-	             bool _in_grid = false);
+	PicturePanel(MainWindow *, const SeriesVec &, const FormulasVec &,
+	             GraphChoicePanel *, bool _in_grid = false);
 	bool switch_zoom() { return zoom_mode = !zoom_mode; }
 	void graph_dialog();
 
@@ -162,5 +168,6 @@ class MainWindow : public QWidget {
 public:
 	ControlPanel *control_panel;
 	GraphChoicePanel *graph_panel;
-	MainWindow(QWidget *parent, const QVector<QVector<SeriesElement>> &charts);
+	MainWindow(QWidget *parent, const QVector<SeriesVec> &baselines,
+	           const QVector<FormulasVec> &charts);
 };

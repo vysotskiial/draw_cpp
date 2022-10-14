@@ -13,6 +13,7 @@
 #include <QApplication>
 #include <QColorDialog>
 #include <QScreen>
+#include <exception>
 #include "widgets.h"
 #include "solver.h"
 #include "formula_processor.h"
@@ -55,10 +56,11 @@ QChart *add_series(QChart *chart, const vector<vector<double>> &vec, int i,
 	return chart;
 }
 
-PicturePanel::PicturePanel(MainWindow *parent,
-                           const QVector<SeriesElement> &series,
+PicturePanel::PicturePanel(MainWindow *parent, const SeriesVec &base,
+                           const FormulasVec &formulas,
                            GraphChoicePanel *c_panel, bool _in_grid)
-  : mw(parent), choice_panel(c_panel), my_elements(series), in_grid(_in_grid)
+  : mw(parent), choice_panel(c_panel), baseline(base), my_elements(formulas),
+    in_grid(_in_grid)
 {
 	process_new_equations();
 	setRubberBand(QChartView::RubberBand::NoRubberBand);
@@ -69,14 +71,15 @@ PicturePanel::PicturePanel(MainWindow *parent,
 	bool ok = KLFBackend::detectSettings(&settings);
 	if (!ok) {
 		// vital program not found
-		throw("error in your system: are latex,dvips and gs installed?");
+		throw(std::runtime_error("error in your system: are latex,dvips and gs "
+		                         "installed?"));
 	}
 
 	input.mathmode = "\\begin{equation*} ... \\end{equation*}";
 	input.preamble = "\\usepackage{amsmath}\n";
 	input.dpi = 300;
 
-	chart_dialog = new ChartDialog(series, this);
+	chart_dialog = new ChartDialog(formulas, this);
 }
 
 void PicturePanel::paintEvent(QPaintEvent *e)
@@ -186,6 +189,11 @@ void PicturePanel::process_new_equations()
 {
 	auto new_chart = make_new_chart();
 	auto old_chart = this->chart();
+
+	for (auto &s : baseline) {
+		old_chart->removeSeries(s);
+		new_chart->addSeries(s);
+	}
 
 	for (auto &e : my_elements) {
 		auto lst = e.init_cond.split(",");
