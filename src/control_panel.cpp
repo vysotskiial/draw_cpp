@@ -9,16 +9,22 @@ using namespace std;
 
 ControlPanel::ControlPanel(QWidget *parent): QWidget(parent)
 {
-	save_button = new QPushButton(QIcon("../images/filesave.png"), "", this);
+	QString images_prefix = IMAGES_PATH;
+	save_button =
+	  new QPushButton(QIcon(images_prefix + "/images/filesave.png"), "", this);
 	save_button->setIconSize({48, 48});
-	zoom_button = new QPushButton(QIcon("../images/zoom_in.png"), "", this);
+	zoom_button =
+	  new QPushButton(QIcon(images_prefix + "/images/zoom_in.png"), "", this);
 	zoom_button->setIconSize({48, 48});
 	zoom_button->setCheckable(true);
-	unzoom_button = new QPushButton(QIcon("../images/zoom_out.png"), "", this);
+	unzoom_button =
+	  new QPushButton(QIcon(images_prefix + "/images/zoom_out.png"), "", this);
 	unzoom_button->setIconSize({48, 48});
-	grid_button = new QPushButton(QIcon("../images/home.png"), "", this);
+	grid_button =
+	  new QPushButton(QIcon(images_prefix + "/images/home.png"), "", this);
 	grid_button->setIconSize({48, 48});
-	graph_button = new QPushButton(QIcon("../images/graph.png"), "", this);
+	graph_button =
+	  new QPushButton(QIcon(images_prefix + "/images/graph.png"), "", this);
 	graph_button->setIconSize({48, 48});
 	coords_text = new QLabel("");
 
