@@ -113,10 +113,10 @@ Operand FormulaProcessor::parse_formula(const std::string &formula)
 	}
 
 	if (owner && owner->is_aux_var(formula))
-		return {OperandType::AuxVariable, formula};
+		return {OperandType::AuxVariable, 0, 0, formula};
 
 	// Should be just a number.
-	return {OperandType::Number, stod(formula)};
+	return {OperandType::Number, 0, stod(formula)};
 }
 
 double FormulaProcessor::operator()(const vector<double> &args)
@@ -124,13 +124,13 @@ double FormulaProcessor::operator()(const vector<double> &args)
 	auto value = [&args, this](const Operand &o) {
 		switch (o.type) {
 		case OperandType::AuxVariable:
-			return owner->variables.at(get<string>(o.value));
+			return owner->variables.at(o.variable);
 		case OperandType::Number:
-			return get<double>(o.value);
+			return o.value;
 		case OperandType::Result:
-			return results[get<size_t>(o.value)];
+			return results[o.idx];
 		case OperandType::Variable:
-			return args[get<size_t>(o.value)];
+			return args[o.idx];
 		}
 		throw runtime_error("Nono");
 	};

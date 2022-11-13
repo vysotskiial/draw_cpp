@@ -25,7 +25,9 @@ enum class OperandType {
 
 struct Operand {
 	OperandType type;
-	std::variant<size_t, double, std::string> value;
+	size_t idx{};
+	double value{};
+	std::string variable{};
 };
 
 struct Operation {
