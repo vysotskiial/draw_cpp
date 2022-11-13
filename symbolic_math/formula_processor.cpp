@@ -7,14 +7,18 @@
 
 using namespace std;
 
-FormulaProcessor::FormulaProcessor(const string &f, int args_num,
+FormulaProcessor::FormulaProcessor(const string &f, size_t args_num,
                                    VectorProcessor *o)
   : owner(o), state_size(args_num)
 {
 	auto formula = f;
 	formula.erase(remove(formula.begin(), formula.end(), ' '), formula.end());
-	operands.resize(args_num); // space for arguments
-	parse_formula(formula);
+	auto operand = parse_formula(formula);
+	// Means formula is trivial i.e. no operations there
+	if (operand.type != OperandType::Result) {
+		trivial = true;
+		trivial_operand = operand;
+	}
 }
 
 bool FormulaProcessor::inside_brackets(const string &f, string::size_type pos)
@@ -41,146 +45,137 @@ string::size_type FormulaProcessor::find_next_token(
 
 // Parsing operation arguments separated with specific token
 // Works for operations with single argument if token_pos == npos
-void FormulaProcessor::parse_separated(OperationType type,
-                                       string::size_type token_pos,
-                                       const string &formula)
+Operation FormulaProcessor::parse_separated(OperationType type,
+                                            string::size_type token_pos,
+                                            const string &formula)
 {
-	SingleOperation op;
+	Operation op;
 	op.type = type;
-	operands.push_back(0); // result
-	op.result_idx = operands.size() - 1;
+	results.push_back(0);
+	op.result_idx = results.size() - 1;
 	string::size_type prev_pos = 0;
-	op.operand_indexes.push_back(operands.size());
-	parse_formula(formula.substr(prev_pos, token_pos - prev_pos));
+	op.operands.push_back(
+	  parse_formula(formula.substr(prev_pos, token_pos - prev_pos)));
 
 	while (token_pos != string::npos) {
 		prev_pos = token_pos + 1;
 		token_pos = find_next_token(formula, {formula[token_pos]}, prev_pos);
-		op.operand_indexes.push_back(operands.size());
-		parse_formula(formula.substr(prev_pos, token_pos - prev_pos));
+		op.operands.push_back(
+		  parse_formula(formula.substr(prev_pos, token_pos - prev_pos)));
 	}
-	operations.push_back(op);
+	return op;
 }
 
-void FormulaProcessor::parse_formula(const std::string &formula)
+Operand FormulaProcessor::parse_formula(const std::string &formula)
 {
 	// cerr << formula << '\n';
 	auto pos = find_next_token(formula, "+-");
 	if (pos != string::npos) {
-		parse_separated(static_cast<OperationType>(formula[pos]), pos, formula);
-		return;
+		operations.push_back(
+		  parse_separated(static_cast<OperationType>(formula[pos]), pos, formula));
+		return {OperandType::Result, operations.back().result_idx};
 	}
 	pos = find_next_token(formula, "*/");
 	if (pos != string::npos) {
-		parse_separated(static_cast<OperationType>(formula[pos]), pos, formula);
-		return;
+		operations.push_back(
+		  parse_separated(static_cast<OperationType>(formula[pos]), pos, formula));
+		return {OperandType::Result, operations.back().result_idx};
 	}
 
 	if (formula.front() == '(' && formula.back() == ')') {
-		parse_formula(formula.substr(1, formula.size() - 2));
-		return;
+		return parse_formula(formula.substr(1, formula.size() - 2));
 	}
 
 	if (formula.starts_with("pow(")) {
 		auto f = formula.substr(4, formula.size() - 5); // strip pow()
 		pos = find_next_token(f, ",");
-		parse_separated(OperationType::opPow, pos, f);
-		return;
+		operations.push_back(parse_separated(OperationType::Pow, pos, f));
+		return {OperandType::Result, operations.back().result_idx};
 	}
 
 	if (formula.starts_with("abs(")) {
 		auto f = formula.substr(4, formula.size() - 5); // strip abs()
-		parse_separated(OperationType::opAbs, string::npos, f);
-		return;
+		operations.push_back(parse_separated(OperationType::Abs, string::npos, f));
+		return {OperandType::Result, operations.back().result_idx};
 	}
 
 	if (formula.starts_with("sign(")) {
 		auto f = formula.substr(5, formula.size() - 6); // strip sign()
-		parse_separated(OperationType::opSign, string::npos, f);
-		return;
+		operations.push_back(parse_separated(OperationType::Sign, string::npos, f));
+		return {OperandType::Result, operations.back().result_idx};
 	}
 
 	if (formula.starts_with(variable)) {
-		auto idx = stoi(formula.substr(1));
+		auto idx = stoul(formula.substr(1));
 		if (idx > state_size)
 			throw runtime_error("State component outside of range used");
-		operands.push_back(0);
-		SingleOperation op;
-		op.type = OperationType::opVariable;
-		op.operand_indexes.push_back(idx - 1); // variables are numerated from 1
-		op.result_idx = operands.size() - 1;
-		operations.push_back(op);
-		return;
+		return {OperandType::Variable, idx - 1};
 	}
 
-	if (owner && owner->is_aux_var(formula)) {
-		operands.push_back(0);
-		SingleOperation op;
-		op.type = OperationType::opAuxVariable;
-		op.result_idx = operands.size() - 1;
-		op.aux_var_name = formula;
-		operations.push_back(op);
-		return;
-	}
+	if (owner && owner->is_aux_var(formula))
+		return {OperandType::AuxVariable, formula};
 
 	// Should be just a number.
-	operands.push_back(0);
-	SingleOperation op;
-	op.type = OperationType::opNumber;
-	op.result_idx = operands.size() - 1;
-	op.num = stod(formula);
-	operations.push_back(op);
+	return {OperandType::Number, stod(formula)};
 }
 
 double FormulaProcessor::operator()(const vector<double> &args)
 {
-	copy(args.begin(), args.end(), operands.begin());
-	for (auto op : operations) {
+	auto value = [&args, this](const Operand &o) {
+		switch (o.type) {
+		case OperandType::AuxVariable:
+			return owner->variables.at(get<string>(o.value));
+		case OperandType::Number:
+			return get<double>(o.value);
+		case OperandType::Result:
+			return results[get<size_t>(o.value)];
+		case OperandType::Variable:
+			return args[get<size_t>(o.value)];
+		}
+		throw runtime_error("Nono");
+	};
+
+	if (trivial)
+		return value(trivial_operand);
+
+	for (auto operation : operations) {
 		// cerr << static_cast<int>(op.type) << " " << op.operand1_idx << '\n';
-		switch (op.type) {
-		case OperationType::opPlus:
-			operands[op.result_idx] = 0;
-			for (auto i : op.operand_indexes)
-				operands[op.result_idx] += operands[i];
+		auto &operands = operation.operands;
+		switch (operation.type) {
+		case OperationType::Plus:
+			results[operation.result_idx] = 0;
+			for (auto operand : operands)
+				results[operation.result_idx] += value(operand);
 			break;
-		case OperationType::opMinus:
-			operands[op.result_idx] = operands[op.operand_indexes[0]];
-			for (auto i = 1u; i < op.operand_indexes.size(); i++)
-				operands[op.result_idx] -= operands[op.operand_indexes[i]];
+		case OperationType::Minus:
+			results[operation.result_idx] = value(operands[0]);
+			for (auto i = 1u; i < operands.size(); i++)
+				results[operation.result_idx] -= value(operands[i]);
 			break;
-		case OperationType::opTimes:
-			operands[op.result_idx] = operands[op.operand_indexes[0]];
-			for (auto i = 1u; i < op.operand_indexes.size(); i++)
-				operands[op.result_idx] *= operands[op.operand_indexes[i]];
+		case OperationType::Times:
+			results[operation.result_idx] = 1;
+			for (auto operand : operands)
+				results[operation.result_idx] *= value(operand);
 			break;
-		case OperationType::opDiv:
-			operands[op.result_idx] = operands[op.operand_indexes[0]];
-			for (auto i = 1u; i < op.operand_indexes.size(); i++)
-				operands[op.result_idx] /= operands[op.operand_indexes[i]];
+		case OperationType::Div:
+			results[operation.result_idx] = value(operands[0]);
+			for (auto i = 1u; i < operands.size(); i++)
+				results[operation.result_idx] /= value(operands[i]);
 			break;
-		case OperationType::opVariable:
-			operands[op.result_idx] = operands[op.operand_indexes[0]];
+		case OperationType::Pow:
+			results[operation.result_idx] =
+			  pow(value(operands[0]), value(operands[1]));
 			break;
-		case OperationType::opPow:
-			operands[op.result_idx] =
-			  pow(operands[op.operand_indexes[0]], operands[op.operand_indexes[1]]);
+		case OperationType::Abs:
+			results[operation.result_idx] = abs(value(operands[0]));
 			break;
-		case OperationType::opAbs:
-			operands[op.result_idx] = abs(operands[op.operand_indexes[0]]);
-			break;
-		case OperationType::opSign:
-			operands[op.result_idx] = (operands[op.operand_indexes[0]] > 0) ? 1 : -1;
-			break;
-		case OperationType::opNumber:
-			operands[op.result_idx] = op.num;
-			break;
-		case OperationType::opAuxVariable:
-			operands[op.result_idx] = owner->variables.at(op.aux_var_name);
+		case OperationType::Sign:
+			results[operation.result_idx] = value(operands[0]) > 0 ? 1 : -1;
 			break;
 		}
 		// cout << operands[op.result_idx] << '\n';
 	}
-	return operands[operations.back().result_idx];
+	return results[operations.back().result_idx];
 }
 
 VectorProcessor::VectorProcessor(const string &str)
