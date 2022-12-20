@@ -11,7 +11,7 @@ enum class OperationType {
 	Minus = '-',
 	Times = '*',
 	Div = '/',
-	Pow,
+	Pow = '^',
 	Abs,
 	Sign,
 };

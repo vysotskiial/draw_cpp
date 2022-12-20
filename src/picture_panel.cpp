@@ -24,7 +24,7 @@ using namespace QtCharts;
 QChart *make_new_chart()
 {
 	auto *new_chart = new QChart();
-	new_chart->legend()->hide();
+	new_chart->legend()->setVisible(true);
 
 	auto x_axis = new QValueAxis();
 	x_axis->setLinePen(Qt::PenStyle::SolidLine);

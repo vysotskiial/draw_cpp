@@ -81,6 +81,11 @@ Operand FormulaProcessor::parse_formula(const std::string &formula)
 		  parse_separated(static_cast<OperationType>(formula[pos]), pos, formula));
 		return {OperandType::Result, operations.back().result_idx};
 	}
+	pos = find_next_token(formula, "^");
+	if (pos != string::npos) {
+		operations.push_back(parse_separated(OperationType::Pow, pos, formula));
+		return {OperandType::Result, operations.back().result_idx};
+	}
 
 	if (formula.front() == '(' && formula.back() == ')') {
 		return parse_formula(formula.substr(1, formula.size() - 2));

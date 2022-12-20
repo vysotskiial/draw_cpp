@@ -18,6 +18,9 @@ TEST(test, basic_arithmetic)
 
 	FormulaProcessor pr_div("x1 / x2", 2);
 	EXPECT_DOUBLE_EQ(pr_div({3, 5}), 3 / 5.);
+
+	FormulaProcessor pr_pow("x1 ^ x2", 2);
+	EXPECT_DOUBLE_EQ(pr_pow({3, 3}), 27);
 }
 
 TEST(test, brackets_arithmetic)
@@ -30,7 +33,7 @@ TEST(test, functions)
 {
 	FormulaProcessor pr_power("x1 - pow(x2, x3)", 3);
 	EXPECT_DOUBLE_EQ(pr_power({3, 4, 1. / 2}), 1);
-	FormulaProcessor pr_my_stuff("x2 - sign(x1)*pow(abs(x1), 0.5)", 2);
+	FormulaProcessor pr_my_stuff("x2 - sign(x1)*abs(x1)^(0.25 + 0.25)", 2);
 	EXPECT_DOUBLE_EQ(pr_my_stuff({-22, 3}), 3 + std::sqrt(22.));
 }
 
