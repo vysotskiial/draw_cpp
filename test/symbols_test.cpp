@@ -7,41 +7,40 @@ using namespace std::string_literals;
 
 TEST(test, basic_arithmetic)
 {
-	FormulaProcessor pr_sum{"x1 + x2"s, 2};
+	FormulaProcessor pr_sum{"x1 + x2"s};
 	EXPECT_DOUBLE_EQ(pr_sum({1, 2}), 3.);
 
-	FormulaProcessor pr_diff("x1 - x2", 2);
+	FormulaProcessor pr_diff("x1 - x2");
 	EXPECT_DOUBLE_EQ(pr_diff({3, 5}), -2.);
 
-	FormulaProcessor pr_mult("x1 * x2", 2);
+	FormulaProcessor pr_mult("x1 * x2");
 	EXPECT_DOUBLE_EQ(pr_mult({3, 5}), 15.);
 
-	FormulaProcessor pr_div("x1 / x2", 2);
+	FormulaProcessor pr_div("x1 / x2");
 	EXPECT_DOUBLE_EQ(pr_div({3, 5}), 3 / 5.);
 
-	FormulaProcessor pr_pow("x1 ^ x2", 2);
+	FormulaProcessor pr_pow("x1 ^ x2");
 	EXPECT_DOUBLE_EQ(pr_pow({3, 3}), 27);
 }
 
 TEST(test, brackets_arithmetic)
 {
-	FormulaProcessor pr_brackets{"(x1 + x2) * x3", 3};
+	FormulaProcessor pr_brackets{"(x1 + x2) * x3"};
 	EXPECT_DOUBLE_EQ(pr_brackets({1, 2, 3}), 9.);
 }
 
 TEST(test, functions)
 {
-	FormulaProcessor pr_power("x1 - pow(x2, x3)", 3);
+	FormulaProcessor pr_power("x1 - x2^x3");
 	EXPECT_DOUBLE_EQ(pr_power({3, 4, 1. / 2}), 1);
-	FormulaProcessor pr_my_stuff("x2 - sign(x1)*abs(x1)^(0.25 + 0.25)", 2);
+	FormulaProcessor pr_my_stuff("x2 - sign(x1)*|x1|^(0.25 + 0.25)");
 	EXPECT_DOUBLE_EQ(pr_my_stuff({-22, 3}), 3 + std::sqrt(22.));
 }
 
 TEST(test, vector_test)
 {
-	VectorProcessor vp("x2 - 10*sign(x1)*pow(abs(x1), 0.5)\n"
-	                   "sign(x2 - 10*sign(x1)*pow(abs(x1), 0.5)) - 2.5 * "
-	                   "sign(x1)\n");
+	VectorProcessor vp("x2 - 10*sign(x1)*|x1|^0.5\n"
+	                   "sign(x2 - 10*sign(x1)*|x1|^0.5) - 2.5*sign(x1)\n");
 	auto vec = vp({16, 3});
 	EXPECT_DOUBLE_EQ(vec[0], -37);
 	EXPECT_DOUBLE_EQ(vec[1], -3.5);
@@ -49,7 +48,7 @@ TEST(test, vector_test)
 
 TEST(test, aux_variable)
 {
-	VectorProcessor vp("v1 = x2 - 10*sign(x1)*pow(abs(x1), 0.5)\n"
+	VectorProcessor vp("v1 = x2 - 10*sign(x1)*|x1|^0.5\n"
 	                   "v1\n"
 	                   "sign(v1) - 2.5 * sign(x1)\n");
 

@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 		series->append({solution[i][0], solution[i][1]});
 	}
 
-	auto eq = "v1 = x2 - 10*sign(x1)*pow(abs(x1), 0.5)\n"
+	auto eq = "v1 = x2 - 10*sign(x1)*|x1|^0.5\n"
 	          "v1\n"
 	          "sign(v1) - 2.5 * sign(x1)\n";
 
