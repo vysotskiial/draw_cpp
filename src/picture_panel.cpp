@@ -15,6 +15,7 @@
 #include <QScreen>
 #include <exception>
 #include "widgets.h"
+#include "picture_panel.h"
 #include "solver.h"
 #include "formula_processor.h"
 
@@ -35,34 +36,10 @@ QChart *make_new_chart()
 	return new_chart;
 }
 
-QChart *add_series(QChart *chart, const vector<vector<double>> &vec, int i,
-                   int j, QColor color, double step)
+PicturePanel::PicturePanel(MainWindow *parent, const SeriesVec &base)
+  : mw(parent), baseline(base)
 {
-	auto series = new QSplineSeries();
-
-	auto pen = series->pen();
-	pen.setWidth(2);
-	pen.setColor(color);
-	series->setPen(pen);
-
-	auto get_value = [&vec, step](int comp, int k) {
-		return (comp == -1) ? k * step : vec[k][comp];
-	};
-	for (auto k = 0u; k < vec.size(); k++)
-		series->append({get_value(i, k), get_value(j, k)});
-
-	chart->addSeries(series);
-
-	return chart;
-}
-
-PicturePanel::PicturePanel(MainWindow *parent, const SeriesVec &base,
-                           const FormulasVec &formulas,
-                           GraphChoicePanel *c_panel, bool _in_grid)
-  : mw(parent), choice_panel(c_panel), baseline(base), my_elements(formulas),
-    in_grid(_in_grid)
-{
-	process_new_equations();
+	draw_new_equations();
 	setRubberBand(QChartView::RubberBand::NoRubberBand);
 	setRenderHint(QPainter::Antialiasing);
 	setMouseTracking(true);
@@ -79,7 +56,7 @@ PicturePanel::PicturePanel(MainWindow *parent, const SeriesVec &base,
 	input.preamble = "\\usepackage{amsmath}\n";
 	input.dpi = 300;
 
-	chart_dialog = new ChartDialog(formulas, this);
+	chart_dialog = new ChartDialog(this);
 }
 
 void PicturePanel::paintEvent(QPaintEvent *e)
@@ -110,9 +87,6 @@ void PicturePanel::paintEvent(QPaintEvent *e)
 
 void PicturePanel::mousePressEvent(QMouseEvent *e)
 {
-	if (in_grid)
-		return;
-
 	if (e->button() != Qt::LeftButton)
 		return;
 
@@ -148,9 +122,6 @@ void PicturePanel::find_text(QPoint pos)
 
 void PicturePanel::mouseDoubleClickEvent(QMouseEvent *e)
 {
-	if (in_grid)
-		return;
-
 	if (zoom_mode)
 		return;
 
@@ -180,12 +151,12 @@ void PicturePanel::graph_dialog()
 {
 	auto elem = chart_dialog->getElements();
 	if (elem.has_value()) {
-		my_elements = elem.value();
-		process_new_equations();
+		formula_lines = elem.value();
+		draw_new_equations();
 	}
 }
 
-void PicturePanel::process_new_equations()
+void PicturePanel::draw_new_equations()
 {
 	auto new_chart = make_new_chart();
 	auto old_chart = this->chart();
@@ -195,17 +166,8 @@ void PicturePanel::process_new_equations()
 		new_chart->addSeries(s);
 	}
 
-	for (auto &e : my_elements) {
-		auto lst = e.init_cond.split(",");
-		std::vector<double> init_cond;
-		for (auto x : lst)
-			init_cond.push_back(x.toDouble());
-
-		VectorProcessor vp(e.equations.toStdString());
-		EulerSolver solver(e.step, e.step_num, init_cond, vp);
-		auto solution = solver.solve();
-		add_series(new_chart, solution, e.x_component, e.y_component, e.color,
-		           e.step);
+	for (auto &line : formula_lines) {
+		new_chart->addSeries(line);
 	}
 	new_chart->createDefaultAxes();
 	for (auto &axis : new_chart->axes()) {
@@ -267,11 +229,6 @@ void PicturePanel::mouseReleaseEvent(QMouseEvent *e)
 	if (e->button() != Qt::LeftButton)
 		return;
 
-	if (in_grid) {
-		choice_panel->from_grid(this);
-		return;
-	}
-
 	mouse_pressed = false;
 
 	if (zoom_mode) {
@@ -292,8 +249,6 @@ void PicturePanel::mouseReleaseEvent(QMouseEvent *e)
 
 void PicturePanel::mouseMoveEvent(QMouseEvent *e)
 {
-	if (in_grid)
-		return;
 	auto coords = widget2chart(e->pos());
 	mw->control_panel->coords_text->setText(QString::number(coords.x(), 'g', 4) +
 	                                        ';' +

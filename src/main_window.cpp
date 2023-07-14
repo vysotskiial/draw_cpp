@@ -1,20 +1,16 @@
 #include <QGridLayout>
 #include <QApplication>
 #include "widgets.h"
+#include "picture_panel.h"
 
-MainWindow::MainWindow(QWidget *parent, const QVector<SeriesVec> &base,
-                       const QVector<FormulasVec> &c)
-  : QWidget(parent)
+MainWindow::MainWindow(QWidget *parent, const SeriesVec &base): QWidget(parent)
 {
 	control_panel = new ControlPanel(this);
+	picture_panel = new PicturePanel(this, base);
 	setWindowTitle(tr("Drawing"));
 	auto layout = new QVBoxLayout(this);
-	auto scroll_area = new QScrollArea(this);
-	graph_panel = new GraphChoicePanel(scroll_area, this, base, c);
-	scroll_area->setWidget(graph_panel);
-	scroll_area->setWidgetResizable(true);
-	layout->addWidget(scroll_area);
+	layout->addWidget(picture_panel);
 	layout->addWidget(control_panel);
 	setLayout(layout);
-	resize(600 * (1 + (c.size() > 1)), 700);
+	resize(600, 700);
 }

@@ -16,15 +16,16 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(IMAGES_INSTALLATION_PATH "/usr/local/share/draw_cpp")
 message(${IMAGES_INSTALLATION_PATH})
 
-add_library(drawing src/picture_panel.cpp src/control_panel.cpp include/widgets.h src/graph_choice_panel.cpp src/main_window.cpp src/chart_dialog.cpp)
+add_library(symbolic_math symbolic_math/formula_processor.cpp)
+target_include_directories(symbolic_math PUBLIC include)
+set_target_properties(symbolic_math PROPERTIES PUBLIC_HEADER "include/formula_processor.h")
+
+add_library(drawing src/picture_panel.cpp src/control_panel.cpp include/widgets.h src/main_window.cpp src/chart_dialog.cpp)
 target_compile_definitions(drawing PRIVATE IMAGES_PATH="${IMAGES_INSTALLATION_PATH}")
 set_target_properties(drawing PROPERTIES PUBLIC_HEADER "include/widgets.h;include/solver.h")
 target_include_directories(drawing PUBLIC include /usr/include/klftools /usr/include/klfbackend)
 target_link_libraries(drawing PUBLIC Qt5::Widgets Qt5::Charts klfbackend)
 
-add_library(symbolic_math symbolic_math/formula_processor.cpp)
-target_include_directories(symbolic_math PUBLIC include)
-set_target_properties(symbolic_math PROPERTIES PUBLIC_HEADER "include/formula_processor.h")
 
 add_executable(graph_test test/main.cpp)
 target_link_libraries(graph_test PRIVATE drawing symbolic_math)

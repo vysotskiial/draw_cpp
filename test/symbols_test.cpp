@@ -39,8 +39,9 @@ TEST(test, functions)
 
 TEST(test, vector_test)
 {
-	VectorProcessor vp("x2 - 10*sign(x1)*|x1|^0.5\n"
-	                   "sign(x2 - 10*sign(x1)*|x1|^0.5) - 2.5*sign(x1)\n");
+	VectorProcessor vp;
+	vp.add_comp("x2 - 10*sign(x1)*|x1|^0.5");
+	vp.add_comp("sign(x2 - 10*sign(x1)*|x1|^0.5) - 2.5*sign(x1)");
 	auto vec = vp({16, 3});
 	EXPECT_DOUBLE_EQ(vec[0], -37);
 	EXPECT_DOUBLE_EQ(vec[1], -3.5);
@@ -48,9 +49,10 @@ TEST(test, vector_test)
 
 TEST(test, aux_variable)
 {
-	VectorProcessor vp("v1 = x2 - 10*sign(x1)*|x1|^0.5\n"
-	                   "v1\n"
-	                   "sign(v1) - 2.5 * sign(x1)\n");
+	VectorProcessor vp;
+	vp.add_comp("v1");
+	vp.add_comp("sign(v1) - 2.5 * sign(x1)");
+	vp["v1"] = "x2 - 10*sign(x1)*|x1|^0.5"s;
 
 	auto vec = vp({16, 3});
 	EXPECT_EQ(vec.size(), 2);

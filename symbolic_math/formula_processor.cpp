@@ -121,8 +121,10 @@ double FormulaProcessor::operator()(const vector<double> &args,
 	auto value = [&args, &results, &vp](const Operand &o) {
 		switch (o.type) {
 		case OperandType::AuxVariable:
-			if (!vp || !vp->is_aux_var(o.variable))
+			if (!vp || !vp->is_aux_var(o.variable)) {
+				cerr << o.variable << '\n';
 				throw runtime_error("Aux variable failure");
+			}
 			return vp->variables.at(o.variable);
 		case OperandType::Number:
 			return o.value;
@@ -130,6 +132,8 @@ double FormulaProcessor::operator()(const vector<double> &args,
 			return results[o.idx];
 		case OperandType::Variable:
 			return args.at(o.idx);
+		default:
+			throw runtime_error("Bad operand");
 		}
 	};
 
@@ -173,37 +177,6 @@ double FormulaProcessor::operator()(const vector<double> &args,
 		// cout << operands[op.result_idx] << '\n';
 	}
 	return results.back();
-}
-
-VectorProcessor::VectorProcessor(const string &str)
-{
-	stringstream sstream(str);
-	std::vector<string> lines;
-	while (sstream.good()) {
-		lines.push_back("");
-		getline(sstream, lines.back());
-		lines.back().erase(remove(lines.back().begin(), lines.back().end(), ' '),
-		                   lines.back().end());
-	}
-	if (lines.back() == "")
-		lines.pop_back();
-
-	for (auto &line : lines) {
-		auto formula = line;
-		formula.erase(remove(formula.begin(), formula.end(), ' '), formula.end());
-		auto pos = formula.find("=");
-		if (pos != string::npos) { // auxilliary variable definition
-			auto var_name = formula.substr(0, pos);
-			if (!isalpha(var_name[0]))
-				throw runtime_error("Variable name is not an identifier"s + var_name);
-			if (aux_variables.count(var_name))
-				throw runtime_error("Variable is defined twice"s + var_name);
-			aux_variables[var_name] = {formula.substr(pos + 1)};
-		}
-		else {
-			components.push_back({formula});
-		}
-	}
 }
 
 vector<double> VectorProcessor::operator()(const vector<double> &args)

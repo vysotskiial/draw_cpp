@@ -1,45 +1,133 @@
-#include <QFormLayout>
 #include <QColorDialog>
 #include <QDialogButtonBox>
+#include <QLabel>
 #include <QMessageBox>
-#include "widgets.h"
-#include "formula_processor.h"
+#include <QApplication>
+#include <QSplineSeries>
+#include "chart_dialog.h"
+#include "solver.h"
 
-ChartDialogTab::ChartDialogTab(const FormulaElement &e, QWidget *parent)
-  : QWidget(parent)
+using namespace std;
+using namespace QtCharts;
+
+AuxVarItem::AuxVarItem(QVBoxLayout *o)
+{
+	static QString im_path = IMAGES_PATH;
+	auto layout = new QHBoxLayout(this);
+	name_edit = new QLineEdit("");
+	formula_edit = new QLineEdit("");
+	layout->addWidget(name_edit);
+	layout->addWidget(new QLabel(" = "));
+	layout->addWidget(formula_edit);
+	auto rm_button = new QPushButton(QIcon(im_path + "/images/delete.png"), "");
+	layout->addWidget(rm_button);
+	connect(rm_button, &QPushButton::released, o,
+	        [o, this]() { o->removeWidget(this); });
+}
+
+AuxVarEdit::AuxVarEdit()
+{
+	layout = new QVBoxLayout(this);
+	auto add_button = new QPushButton("Add auxilliary");
+	layout->addWidget(add_button);
+
+	connect(add_button, &QPushButton::released, this,
+	        [this]() { layout->addWidget(new AuxVarItem(layout)); });
+}
+
+map<QString, QString> AuxVarEdit::get() const
+{
+	map<QString, QString> result;
+	for (auto i = 1; i < layout->count(); i++) {
+		auto item = layout->itemAt(i);
+		auto variable = dynamic_cast<AuxVarItem *>(item->widget());
+		result[variable->name()] = variable->formula();
+	}
+	return result;
+}
+
+EquationsEdit::EquationsEdit()
+{
+	auto layout = new QFormLayout(this);
+	auto add_button = new QPushButton("Add component");
+	auto rm_button = new QPushButton("Remove component");
+	layout->addRow(add_button, rm_button);
+	connect(add_button, &QPushButton::released, this, [layout, this]() {
+		auto new_edit = new QLineEdit("");
+		edits.append(new_edit);
+		layout->addRow("dx" + QString::number(layout->rowCount()), new_edit);
+	});
+	connect(rm_button, &QPushButton::released, this, [layout, this]() {
+		if (layout->rowCount() > 1) {
+			layout->removeRow(layout->rowCount() - 1);
+			edits.pop_back();
+		}
+	});
+}
+
+QVector<QString> EquationsEdit::get() const
+{
+	QVector<QString> result;
+	transform(begin(edits), end(edits), back_inserter(result),
+	          [](auto edit) { return edit->text(); });
+
+	return result;
+}
+
+InitEdit::InitEdit(int state_size, QWidget *parent): QDialog(parent)
+{
+	auto layout = new QFormLayout(this);
+	for (auto i = 1; i <= state_size; i++) {
+		auto edit = new QLineEdit("");
+		edit->setValidator(new QDoubleValidator(-1000, 1000, 3, edit));
+		layout->addRow("x" + QString::number(i) + "(0) = ", edit);
+		edits.append(edit);
+	}
+
+	auto buttonBox =
+	  new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
+	                       Qt::Horizontal, this);
+	connect(buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
+	connect(buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
+	layout->addRow(buttonBox);
+}
+
+vector<double> InitEdit::get() const
+{
+	vector<double> result;
+	transform(begin(edits), end(edits), back_inserter(result),
+	          [](auto edit) { return edit->text().toInt(); });
+	return result;
+}
+
+ChartDialogTab::ChartDialogTab(QWidget *parent): QWidget(parent)
 {
 	auto form = new QFormLayout(this);
+	aux_edit = new AuxVarEdit;
+	equations_edit = new EquationsEdit;
+	form->addRow(aux_edit);
+	form->addRow(equations_edit);
 
-	// Add some text above the fields
-	form->addRow(new QLabel("Input chart"));
-
-	equations_edit = new QTextEdit(this);
-	equations_edit->setPlainText(e.equations);
-	equations_edit->setLineWrapMode(QTextEdit::NoWrap);
-	form->addRow("Equations", equations_edit);
-
-	init_edit = new QLineEdit(this);
-	init_edit->setPlaceholderText("Comma separated, e.g. 1,2,3");
-	init_edit->setText(e.init_cond);
-	form->addRow("Initial conditions", init_edit);
+	auto init_button = new QPushButton("Initial conditions");
+	connect(init_button, &QPushButton::released, this, [this]() {
+		auto init_edit = InitEdit(equations_edit->size(), this);
+		if (init_edit.exec() == QDialog::Accepted) {
+			init_value = init_edit.get();
+		}
+	});
+	form->addRow(init_button);
 
 	step_edit = new QDoubleSpinBox(this);
 	step_edit->setDecimals(5);
-	step_edit->setValue(e.step);
 	steps_num_edit = new QSpinBox(this);
 	steps_num_edit->setMaximum(10e8);
-	steps_num_edit->setValue(e.step_num);
 	auto steps_layout = new QHBoxLayout();
 	steps_layout->addWidget(step_edit);
 	steps_layout->addWidget(steps_num_edit);
 	form->addRow("Step and steps number", steps_layout);
 
 	x_comp_edit = new QSpinBox(this);
-	x_comp_edit->setMinimum(-1);
-	x_comp_edit->setValue(e.x_component);
 	y_comp_edit = new QSpinBox(this);
-	y_comp_edit->setMinimum(-1);
-	y_comp_edit->setValue(e.y_component);
 	auto comps_layout = new QHBoxLayout();
 	comps_layout->addWidget(x_comp_edit);
 	comps_layout->addWidget(y_comp_edit);
@@ -47,8 +135,8 @@ ChartDialogTab::ChartDialogTab(const FormulaElement &e, QWidget *parent)
 
 	QPixmap icon_map(100, 100);
 	icon_map.fill(color);
-	color_button = new QPushButton(QIcon(icon_map), "Choose color", this);
-	auto choose_color = [this]() {
+	auto color_button = new QPushButton(QIcon(icon_map), "Choose color", this);
+	auto choose_color = [color_button, this]() {
 		color = QColorDialog::getColor(Qt::black, this, "Select color");
 		QPixmap pixmap(100, 100);
 		pixmap.fill(color);
@@ -58,51 +146,73 @@ ChartDialogTab::ChartDialogTab(const FormulaElement &e, QWidget *parent)
 	form->addRow(color_button);
 }
 
-std::optional<FormulasVec> ChartDialog::getElements()
+bool ChartDialogTab::check()
+{
+	vp = {};
+	try {
+		for (auto &eq : equations_edit->get())
+			vp.add_comp(eq.toStdString());
+		for (auto &[name, eq] : aux_edit->get())
+			vp[name.toStdString()] = eq.toStdString();
+	}
+	catch (exception &e) {
+		// TODO location of error
+		QMessageBox::warning(this, "Error", "Wrong equation format");
+		return false;
+	}
+
+	return true;
+}
+
+QAbstractSeries *ChartDialogTab::get() const
+{
+	auto step = step_edit->value();
+	auto steps_num = steps_num_edit->value();
+	EulerSolver solver(step, steps_num, init_value, vp);
+	auto solution = solver.solve();
+	auto series = new QSplineSeries();
+
+	auto pen = series->pen();
+	pen.setWidth(2);
+	pen.setColor(color);
+	series->setPen(pen);
+
+	auto x_comp = x_comp_edit->value();
+	auto y_comp = y_comp_edit->value();
+
+	auto get_value = [&solution, step](int comp, int k) {
+		return (comp == -1) ? k * step : solution[k][comp];
+	};
+	for (auto k = 0u; k < solution.size(); k++)
+		series->append({get_value(x_comp, k), get_value(y_comp, k)});
+
+	return series;
+}
+
+std::optional<SeriesVec> ChartDialog::getElements()
 {
 	if (exec() != QDialog::Accepted) {
 		return {};
 	}
-	FormulasVec elements;
-	for (auto i = 0; i < tabs->count(); i++) {
-		FormulaElement element;
-		auto tab = dynamic_cast<ChartDialogTab *>(tabs->widget(i));
-		element.equations = tab->equations_edit->toPlainText();
-		try {
-			VectorProcessor vp(element.equations.toStdString());
-		}
-		catch (std::invalid_argument &e) {
-			QMessageBox::warning(this, "Equation error", "Wrong equation format");
+	for (auto &tab : tabs)
+		if (!tab->check())
 			return {};
-		}
-		catch (std::exception &e) {
-			QMessageBox::warning(this, "Equation error", e.what());
-			return {};
-		}
-		element.x_component = tab->x_comp_edit->value();
-		element.y_component = tab->y_comp_edit->value();
-		element.color = tab->color;
-		element.init_cond = tab->init_edit->text();
-		element.step = tab->step_edit->value();
-		element.step_num = tab->steps_num_edit->value();
-		elements.append(element);
-	}
-	return elements;
+
+	SeriesVec result;
+	transform(begin(tabs), end(tabs), back_inserter(result),
+	          [](auto tab) { return tab->get(); });
+	return result;
 }
 
-ChartDialog::ChartDialog(const FormulasVec &elements, QWidget *p): QDialog(p)
+ChartDialog::ChartDialog(QWidget *p): QDialog(p)
 {
 	auto form = new QFormLayout(this);
-	tabs = new QTabWidget(this);
-	int i = 1;
-	for (auto &e : elements) {
-		tabs->addTab(new ChartDialogTab(e, this), "Chart " + QString::number(i));
-	}
-	form->addRow(tabs);
+	auto tab_widget = new QTabWidget(this);
+	form->addRow(tab_widget);
 
 	auto add_rm_layout = new QHBoxLayout();
-	add_button = new QPushButton("Add series", this);
-	remove_button = new QPushButton("Remove series", this);
+	auto add_button = new QPushButton("Add series", this);
+	auto remove_button = new QPushButton("Remove series", this);
 	add_rm_layout->addWidget(add_button);
 	add_rm_layout->addWidget(remove_button);
 	form->addRow(add_rm_layout);
@@ -113,18 +223,13 @@ ChartDialog::ChartDialog(const FormulasVec &elements, QWidget *p): QDialog(p)
 	form->addRow(buttonBox);
 	connect(buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
 	connect(buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
-	connect(add_button, &QPushButton::released, this, &ChartDialog::on_add);
-	connect(remove_button, &QPushButton::released, this, &ChartDialog::on_remove);
-}
-
-void ChartDialog::on_add()
-{
-	tabs->addTab(new ChartDialogTab({}, this),
-	             "Chart " + QString::number(tabs->count() + 1));
-	tabs->setCurrentIndex(tabs->count() - 1);
-}
-
-void ChartDialog::on_remove()
-{
-	tabs->removeTab(tabs->currentIndex());
+	connect(add_button, &QPushButton::released, this, [tab_widget, this]() {
+		tabs.push_back(new ChartDialogTab(this));
+		tab_widget->addTab(tabs.back(), "Chart " + QString::number(tabs.size()));
+		tab_widget->setCurrentIndex(tabs.size() - 1);
+	});
+	connect(remove_button, &QPushButton::released, this, [tab_widget, this]() {
+		tabs.erase(begin(tabs) + tab_widget->currentIndex());
+		tab_widget->removeTab(tab_widget->currentIndex());
+	});
 }

@@ -5,6 +5,7 @@
 #include <variant>
 
 constexpr char arithmetic_operations[] = "+-*/";
+// TODO unary minus, perhaps time variable
 
 enum class OperationType {
 	Plus = '+',
@@ -12,7 +13,7 @@ enum class OperationType {
 	Times = '*',
 	Div = '/',
 	Pow = '^',
-	Abs,
+	Abs = '|',
 	Sign,
 };
 
@@ -71,6 +72,13 @@ public:
 	bool is_aux_var(const std::string &name) { return aux_variables.count(name); }
 	std::map<std::string, double> variables; // Auxilliary stuff
 	std::vector<double> operator()(const std::vector<double> &);
-	VectorProcessor(const std::string &str);
+	void add_comp(const std::string &formula) { components.push_back(formula); }
+	FormulaProcessor &operator[](const std::string &name)
+	{
+		return aux_variables[name];
+	}
+
+	VectorProcessor() = default;
 	VectorProcessor(const VectorProcessor &) = default;
+	VectorProcessor &operator=(const VectorProcessor &other) = default;
 };

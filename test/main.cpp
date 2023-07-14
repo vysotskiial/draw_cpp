@@ -47,19 +47,7 @@ int main(int argc, char *argv[])
 		series->append({solution[i][0], solution[i][1]});
 	}
 
-	auto eq = "v1 = x2 - 10*sign(x1)*|x1|^0.5\n"
-	          "v1\n"
-	          "sign(v1) - 2.5 * sign(x1)\n";
-
-	auto start = chrono::high_resolution_clock::now();
-	EulerSolver solver1(0.001, 10000, {0, 15}, VectorProcessor(eq));
-	auto solution1 = solver1.solve();
-	auto stop = chrono::high_resolution_clock::now();
-
-	cout << "Modeling with cpp function took "
-	     << chrono::duration_cast<Sec>(stop - start).count() << '\n';
-
-	MainWindow window(nullptr, {{series}}, {{{eq, "0, 35"}}});
+	MainWindow window(nullptr, {series});
 	window.show();
 	return app.exec();
 }
