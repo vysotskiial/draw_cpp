@@ -64,6 +64,9 @@ Operation FormulaProcessor::operation(OperationType type,
 Operand FormulaProcessor::operand(const std::string &formula)
 {
 	// cerr << formula << '\n';
+	if (formula[0] == '-')
+		return operand("0" + formula);
+
 	auto pos = find_next_token(formula, "+-");
 	if (pos != string::npos) {
 		operations.push_back(
