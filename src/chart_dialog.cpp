@@ -46,21 +46,24 @@ map<QString, QString> AuxVarEdit::get() const
 	return result;
 }
 
-EquationsEdit::EquationsEdit()
+EquationsEdit::EquationsEdit(ChartDialogTab *parent)
 {
 	auto layout = new QFormLayout(this);
 	auto add_button = new QPushButton("Add component");
 	auto rm_button = new QPushButton("Remove component");
 	layout->addRow(add_button, rm_button);
-	connect(add_button, &QPushButton::released, this, [layout, this]() {
+	connect(add_button, &QPushButton::released, this, [layout, this, parent]() {
 		auto new_edit = new QLineEdit("");
 		edits.append(new_edit);
-		layout->addRow("dx" + QString::number(layout->rowCount()), new_edit);
+		auto idx = QString::number(layout->rowCount());
+		layout->addRow("dx" + idx + " = ", new_edit);
+		parent->comp_added(idx);
 	});
-	connect(rm_button, &QPushButton::released, this, [layout, this]() {
+	connect(rm_button, &QPushButton::released, this, [layout, this, parent]() {
 		if (layout->rowCount() > 1) {
 			layout->removeRow(layout->rowCount() - 1);
 			edits.pop_back();
+			parent->comp_removed();
 		}
 	});
 }
@@ -100,11 +103,23 @@ vector<double> InitEdit::get() const
 	return result;
 }
 
+void ChartDialogTab::comp_added(const QString &num)
+{
+	x_comp_edit->addItem("x" + num);
+	y_comp_edit->addItem("x" + num);
+}
+
+void ChartDialogTab::comp_removed()
+{
+	x_comp_edit->removeItem(x_comp_edit->count() - 1);
+	y_comp_edit->removeItem(y_comp_edit->count() - 1);
+}
+
 ChartDialogTab::ChartDialogTab(QWidget *parent): QWidget(parent)
 {
 	auto form = new QFormLayout(this);
 	aux_edit = new AuxVarEdit;
-	equations_edit = new EquationsEdit;
+	equations_edit = new EquationsEdit(this);
 	form->addRow(aux_edit);
 	form->addRow(equations_edit);
 
@@ -118,20 +133,26 @@ ChartDialogTab::ChartDialogTab(QWidget *parent): QWidget(parent)
 	form->addRow(init_button);
 
 	step_edit = new QDoubleSpinBox(this);
+	step_edit->setSingleStep(0.001);
 	step_edit->setDecimals(5);
 	steps_num_edit = new QSpinBox(this);
-	steps_num_edit->setMaximum(10e8);
+	steps_num_edit->setSingleStep(1000);
+	steps_num_edit->setMaximum(1e9);
 	auto steps_layout = new QHBoxLayout();
 	steps_layout->addWidget(step_edit);
 	steps_layout->addWidget(steps_num_edit);
-	form->addRow("Step and steps number", steps_layout);
+	form->addRow("Step and step number:", steps_layout);
 
-	x_comp_edit = new QSpinBox(this);
-	y_comp_edit = new QSpinBox(this);
+	x_comp_edit = new QComboBox(this);
+	y_comp_edit = new QComboBox(this);
+	x_comp_edit->addItem("t");
+	y_comp_edit->addItem("t");
 	auto comps_layout = new QHBoxLayout();
+	comps_layout->addWidget(new QLabel("x"));
 	comps_layout->addWidget(x_comp_edit);
+	comps_layout->addWidget(new QLabel("y"));
 	comps_layout->addWidget(y_comp_edit);
-	form->addRow("State vector components", comps_layout);
+	form->addRow("Axis:", comps_layout);
 
 	QPixmap icon_map(100, 100);
 	icon_map.fill(color);
@@ -177,8 +198,8 @@ QAbstractSeries *ChartDialogTab::get() const
 	pen.setColor(color);
 	series->setPen(pen);
 
-	auto x_comp = x_comp_edit->value();
-	auto y_comp = y_comp_edit->value();
+	auto x_comp = x_comp_edit->currentIndex() - 1;
+	auto y_comp = y_comp_edit->currentIndex() - 1;
 
 	auto get_value = [&solution, step](int comp, int k) {
 		return (comp == -1) ? k * step : solution[k][comp];

@@ -32,11 +32,13 @@ public:
 	std::map<QString, QString> get() const;
 };
 
+class ChartDialogTab;
+
 class EquationsEdit : public QWidget {
 	QVector<QLineEdit *> edits;
 
 public:
-	EquationsEdit();
+	EquationsEdit(ChartDialogTab *parent);
 	QVector<QString> get() const;
 	int size() const { return edits.size(); }
 };
@@ -54,8 +56,8 @@ class ChartDialogTab : public QWidget {
 	EquationsEdit *equations_edit;
 	QDoubleSpinBox *step_edit;
 	QSpinBox *steps_num_edit;
-	QSpinBox *x_comp_edit;
-	QSpinBox *y_comp_edit;
+	QComboBox *x_comp_edit;
+	QComboBox *y_comp_edit;
 
 	std::vector<double> init_value;
 	VectorProcessor vp;
@@ -64,6 +66,8 @@ class ChartDialogTab : public QWidget {
 
 public:
 	bool check();
+	void comp_added(const QString &num);
+	void comp_removed();
 	QtCharts::QAbstractSeries *get() const;
 	ChartDialogTab(QWidget *p);
 };
