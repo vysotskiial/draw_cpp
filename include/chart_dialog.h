@@ -44,20 +44,24 @@ public:
 };
 
 class InitEdit : public QDialog {
+	QFormLayout *layout;
 	QVector<QLineEdit *> edits;
 
 public:
-	InitEdit(int state_size, QWidget *parent);
+	InitEdit(QWidget *parent);
 	std::vector<double> get() const;
+	friend class ChartDialogTab;
 };
 
 class ChartDialogTab : public QWidget {
+	QPushButton *init_button;
 	AuxVarEdit *aux_edit;
 	EquationsEdit *equations_edit;
 	QDoubleSpinBox *step_edit;
 	QSpinBox *steps_num_edit;
 	QComboBox *x_comp_edit;
 	QComboBox *y_comp_edit;
+	InitEdit *init_edit;
 
 	std::vector<double> init_value;
 	VectorProcessor vp;
@@ -68,7 +72,7 @@ public:
 	bool check();
 	void comp_added(const QString &num);
 	void comp_removed();
-	QtCharts::QAbstractSeries *get() const;
+	QtCharts::QAbstractSeries *get();
 	ChartDialogTab(QWidget *p);
 };
 

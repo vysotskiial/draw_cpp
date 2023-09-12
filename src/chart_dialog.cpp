@@ -16,9 +16,9 @@ AuxVarItem::AuxVarItem(QVBoxLayout *o)
 	auto layout = new QHBoxLayout(this);
 	name_edit = new QLineEdit("");
 	formula_edit = new QLineEdit("");
-	layout->addWidget(name_edit);
-	layout->addWidget(new QLabel(" = "));
-	layout->addWidget(formula_edit);
+	layout->addWidget(name_edit, 2);
+	layout->addWidget(new QLabel("="));
+	layout->addWidget(formula_edit, 6);
 	auto rm_button = new QPushButton(QIcon(im_path + "/images/delete.png"), "");
 	layout->addWidget(rm_button);
 	connect(rm_button, &QPushButton::released, o,
@@ -48,20 +48,26 @@ map<QString, QString> AuxVarEdit::get() const
 
 EquationsEdit::EquationsEdit(ChartDialogTab *parent)
 {
-	auto layout = new QFormLayout(this);
+	auto layout = new QVBoxLayout(this);
 	auto add_button = new QPushButton("Add component");
 	auto rm_button = new QPushButton("Remove component");
-	layout->addRow(add_button, rm_button);
+	auto but_layout = new QHBoxLayout;
+	but_layout->addWidget(add_button);
+	but_layout->addWidget(rm_button);
+	layout->addLayout(but_layout);
 	connect(add_button, &QPushButton::released, this, [layout, this, parent]() {
+		auto edit_layout = new QHBoxLayout;
 		auto new_edit = new QLineEdit("");
 		edits.append(new_edit);
-		auto idx = QString::number(layout->rowCount());
-		layout->addRow("dx" + idx + " = ", new_edit);
+		auto idx = QString::number(layout->count());
+		edit_layout->addWidget(new QLabel("dx" + idx + " = "), 1);
+		edit_layout->addWidget(new_edit, 5);
+		layout->addLayout(edit_layout);
 		parent->comp_added(idx);
 	});
 	connect(rm_button, &QPushButton::released, this, [layout, this, parent]() {
-		if (layout->rowCount() > 1) {
-			layout->removeRow(layout->rowCount() - 1);
+		if (layout->count() > 1) {
+			layout->removeItem(layout->itemAt(layout->count() - 1));
 			edits.pop_back();
 			parent->comp_removed();
 		}
@@ -77,15 +83,9 @@ QVector<QString> EquationsEdit::get() const
 	return result;
 }
 
-InitEdit::InitEdit(int state_size, QWidget *parent): QDialog(parent)
+InitEdit::InitEdit(QWidget *parent): QDialog(parent)
 {
-	auto layout = new QFormLayout(this);
-	for (auto i = 1; i <= state_size; i++) {
-		auto edit = new QLineEdit("");
-		edit->setValidator(new QDoubleValidator(-1000, 1000, 3, edit));
-		layout->addRow("x" + QString::number(i) + "(0) = ", edit);
-		edits.append(edit);
-	}
+	layout = new QFormLayout(this);
 
 	auto buttonBox =
 	  new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
@@ -105,14 +105,25 @@ vector<double> InitEdit::get() const
 
 void ChartDialogTab::comp_added(const QString &num)
 {
-	x_comp_edit->addItem("x" + num);
-	y_comp_edit->addItem("x" + num);
+	auto comp = "x" + num;
+	init_edit->edits.push_back(new QLineEdit);
+	init_edit->layout->insertRow(init_edit->layout->rowCount() - 1,
+	                             comp + "(0) = ", init_edit->edits.back());
+	x_comp_edit->addItem(comp);
+	y_comp_edit->addItem(comp);
+	init_button->setStyleSheet("QPushButton {color: red;}");
+	init_value.clear();
 }
 
 void ChartDialogTab::comp_removed()
 {
 	x_comp_edit->removeItem(x_comp_edit->count() - 1);
 	y_comp_edit->removeItem(y_comp_edit->count() - 1);
+	delete init_edit->edits.back();
+	init_edit->edits.pop_back();
+	init_edit->layout->removeRow(init_edit->layout->rowCount() - 2);
+	init_button->setStyleSheet("QPushButton {color: red;}");
+	init_value.clear();
 }
 
 ChartDialogTab::ChartDialogTab(QWidget *parent): QWidget(parent)
@@ -122,12 +133,15 @@ ChartDialogTab::ChartDialogTab(QWidget *parent): QWidget(parent)
 	equations_edit = new EquationsEdit(this);
 	form->addRow(aux_edit);
 	form->addRow(equations_edit);
+	init_edit = new InitEdit(this);
 
-	auto init_button = new QPushButton("Initial conditions");
+	init_button = new QPushButton("Initial conditions");
+	init_button->setStyleSheet("QPushButton {color: red;}");
+
 	connect(init_button, &QPushButton::released, this, [this]() {
-		auto init_edit = InitEdit(equations_edit->size(), this);
-		if (init_edit.exec() == QDialog::Accepted) {
-			init_value = init_edit.get();
+		if (init_edit->exec() == QDialog::Accepted) {
+			init_value = init_edit->get();
+			init_button->setStyleSheet("QPushButton {color: black;}");
 		}
 	});
 	form->addRow(init_button);
@@ -135,9 +149,11 @@ ChartDialogTab::ChartDialogTab(QWidget *parent): QWidget(parent)
 	step_edit = new QDoubleSpinBox(this);
 	step_edit->setSingleStep(0.001);
 	step_edit->setDecimals(5);
+	step_edit->setValue(0.001);
 	steps_num_edit = new QSpinBox(this);
 	steps_num_edit->setSingleStep(1000);
 	steps_num_edit->setMaximum(1e9);
+	steps_num_edit->setValue(1e4);
 	auto steps_layout = new QHBoxLayout();
 	steps_layout->addWidget(step_edit);
 	steps_layout->addWidget(steps_num_edit);
@@ -185,12 +201,23 @@ bool ChartDialogTab::check()
 	return true;
 }
 
-QAbstractSeries *ChartDialogTab::get() const
+QAbstractSeries *ChartDialogTab::get()
 {
+	if (!init_value.size()) {
+		QMessageBox::warning(this, "Error", "Initial conditions not set");
+		return nullptr;
+	}
 	auto step = step_edit->value();
 	auto steps_num = steps_num_edit->value();
 	EulerSolver solver(step, steps_num, init_value, vp);
-	auto solution = solver.solve();
+	decltype(solver.solve()) solution;
+	try {
+		solution = solver.solve();
+	}
+	catch (exception &e) {
+		QMessageBox::warning(this, "Error", "Wrong equation format");
+		return nullptr;
+	}
 	auto series = new QSplineSeries();
 
 	auto pen = series->pen();
@@ -212,16 +239,19 @@ QAbstractSeries *ChartDialogTab::get() const
 
 std::optional<SeriesVec> ChartDialog::getElements()
 {
-	if (exec() != QDialog::Accepted) {
+	if (exec() != QDialog::Accepted)
 		return {};
-	}
-	for (auto &tab : tabs)
-		if (!tab->check())
-			return {};
 
 	SeriesVec result;
-	transform(begin(tabs), end(tabs), back_inserter(result),
-	          [](auto tab) { return tab->get(); });
+	for (auto &tab : tabs) {
+		if (!tab->check())
+			return {};
+		auto series = tab->get();
+		if (!series)
+			return {};
+		result.push_back(series);
+	}
+
 	return result;
 }
 
