@@ -53,6 +53,8 @@ public:
 	PicturePanel(MainWindow *, const SeriesVec &);
 	bool switch_zoom() { return zoom_mode = !zoom_mode; }
 	void graph_dialog();
+	void open_project(QString filename);
+	void save_project(QString filename);
 
 protected:
 	void mouseMoveEvent(QMouseEvent *e) override;

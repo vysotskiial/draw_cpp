@@ -11,6 +11,9 @@ using namespace std;
 ControlPanel::ControlPanel(MainWindow *parent): QWidget(parent), mw(parent)
 {
 	QString images_prefix = IMAGES_PATH;
+	auto open_button =
+	  new QPushButton(QIcon(images_prefix + "/images/folder.png"), "", this);
+	open_button->setIconSize({48, 48});
 	auto save_button =
 	  new QPushButton(QIcon(images_prefix + "/images/filesave.png"), "", this);
 	save_button->setIconSize({48, 48});
@@ -26,13 +29,19 @@ ControlPanel::ControlPanel(MainWindow *parent): QWidget(parent), mw(parent)
 	graph_button->setIconSize({48, 48});
 	coords_text = new QLabel("");
 
+	connect(open_button, &QPushButton::released, this, &ControlPanel::on_open);
 	connect(save_button, &QPushButton::released, this, &ControlPanel::on_save);
-	connect(zoom_button, &QPushButton::released, this, &ControlPanel::on_zoom);
+	connect(zoom_button, &QPushButton::released, this, [this]() {
+		auto zoom = mw->picture_panel->switch_zoom();
+		zoom_button->setChecked(zoom);
+	});
 	connect(unzoom_button, &QPushButton::released, this,
-	        &ControlPanel::on_unzoom);
-	connect(graph_button, &QPushButton::released, this, &ControlPanel::on_graph);
+	        [this]() { mw->picture_panel->chart()->zoomReset(); });
+	connect(graph_button, &QPushButton::released, this,
+	        [this]() { mw->picture_panel->graph_dialog(); });
 
 	auto layout = new QHBoxLayout(this);
+	layout->addWidget(open_button);
 	layout->addWidget(save_button);
 	layout->addWidget(zoom_button);
 	layout->addWidget(unzoom_button);
@@ -44,27 +53,23 @@ ControlPanel::ControlPanel(MainWindow *parent): QWidget(parent), mw(parent)
 
 void ControlPanel::on_save()
 {
-	auto fileName =
-	  QFileDialog::getSaveFileName(this, "Save Picture", "", "PNG file (*.png)");
+	auto fileName = QFileDialog::getSaveFileName(this, "Save Project", "",
+	                                             "Save options (*.png *.json)");
 
 	if (!fileName.size())
 		return;
 
-	mw->picture_panel->grab().save(fileName);
+	if (fileName.endsWith("png"))
+		mw->picture_panel->grab().save(fileName);
+	else
+		mw->picture_panel->save_project(fileName);
 }
 
-void ControlPanel::on_zoom()
+void ControlPanel::on_open()
 {
-	auto zoom = mw->picture_panel->switch_zoom();
-	zoom_button->setChecked(zoom);
-}
-
-void ControlPanel::on_unzoom()
-{
-	mw->picture_panel->chart()->zoomReset();
-}
-
-void ControlPanel::on_graph()
-{
-	mw->picture_panel->graph_dialog();
+	auto filename =
+	  QFileDialog::getOpenFileName(this, "Open project", "", "JSON (*.json)");
+	if (!filename.size())
+		return;
+	mw->picture_panel->open_project(filename);
 }

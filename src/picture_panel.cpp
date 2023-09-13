@@ -147,6 +147,18 @@ QPixmap PicturePanel::process_latex()
 	return pm;
 }
 
+void PicturePanel::open_project(QString fileName)
+{
+	chart_dialog->import(fileName.toStdString());
+	graph_dialog();
+}
+
+void PicturePanel::save_project(QString filename)
+{
+	// TODO save and import latex
+	chart_dialog->save(filename.toStdString());
+}
+
 void PicturePanel::graph_dialog()
 {
 	auto elem = chart_dialog->getElements();

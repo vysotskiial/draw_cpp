@@ -3,6 +3,7 @@ project(drawing VERSION 1.0)
 
 find_package(Qt5 REQUIRED COMPONENTS Widgets Charts)
 find_package(GTest REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -24,7 +25,7 @@ add_library(drawing src/picture_panel.cpp src/control_panel.cpp include/widgets.
 target_compile_definitions(drawing PRIVATE IMAGES_PATH="${IMAGES_INSTALLATION_PATH}")
 set_target_properties(drawing PROPERTIES PUBLIC_HEADER "include/widgets.h;include/solver.h")
 target_include_directories(drawing PUBLIC include /usr/include/klftools /usr/include/klfbackend)
-target_link_libraries(drawing PUBLIC Qt5::Widgets Qt5::Charts klfbackend)
+target_link_libraries(drawing PUBLIC Qt5::Widgets Qt5::Charts klfbackend nlohmann_json::nlohmann_json)
 
 
 add_executable(graph_test test/main.cpp)

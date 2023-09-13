@@ -23,11 +23,8 @@ class ControlPanel : public QWidget {
 	MainWindow *mw;
 	QPushButton *zoom_button;
 
-private slots:
 	void on_save();
-	void on_zoom();
-	void on_unzoom();
-	void on_graph();
+	void on_open();
 
 public:
 	ControlPanel(MainWindow *parent = nullptr);
