@@ -22,8 +22,10 @@ class ControlPanel : public QWidget {
 	Q_OBJECT
 	MainWindow *mw;
 	QPushButton *zoom_button;
+	QString save_file{};
 
 	void on_save();
+	void save(const QString &filename);
 	void on_open();
 
 public:

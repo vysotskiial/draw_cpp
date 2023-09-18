@@ -2,6 +2,7 @@
 #include <QFileDialog>
 #include <QPdfWriter>
 #include <QBitmap>
+#include <QShortcut>
 #include <iostream>
 #include <string>
 #include "widgets.h"
@@ -40,6 +41,14 @@ ControlPanel::ControlPanel(MainWindow *parent): QWidget(parent), mw(parent)
 	connect(graph_button, &QPushButton::released, this,
 	        [this]() { mw->picture_panel->graph_dialog(); });
 
+	auto save_as = new QShortcut(QKeySequence("Ctrl+Shift+S"), this);
+	connect(save_as, &QShortcut::activated, this, &ControlPanel::on_save);
+	auto save = new QShortcut(QKeySequence("Ctrl+S"), this);
+	connect(save, &QShortcut::activated, this, [this]() {
+		if (save_file.size())
+			this->save(save_file);
+	});
+
 	auto layout = new QHBoxLayout(this);
 	layout->addWidget(open_button);
 	layout->addWidget(save_button);
@@ -59,10 +68,22 @@ void ControlPanel::on_save()
 	if (!fileName.size())
 		return;
 
-	if (fileName.endsWith("png"))
+	save(fileName);
+}
+
+void ControlPanel::save(const QString &fileName)
+{
+	if (fileName.endsWith("png")) {
 		mw->picture_panel->grab().save(fileName);
-	else
+	}
+	else {
+		save_file = fileName;
+		QFileInfo fi(save_file);
+		mw->setWindowTitle(fi.fileName());
 		mw->picture_panel->save_project(fileName);
+	}
+	if (mw->windowTitle().endsWith("[+]"))
+		mw->setWindowTitle(mw->windowTitle().chopped(3));
 }
 
 void ControlPanel::on_open()
@@ -71,5 +92,9 @@ void ControlPanel::on_open()
 	  QFileDialog::getOpenFileName(this, "Open project", "", "JSON (*.json)");
 	if (!filename.size())
 		return;
+
 	mw->picture_panel->open_project(filename);
+	save_file = filename;
+	QFileInfo fi(save_file);
+	mw->setWindowTitle(fi.fileName());
 }

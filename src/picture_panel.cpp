@@ -13,6 +13,7 @@
 #include <QApplication>
 #include <QColorDialog>
 #include <QScreen>
+#include <QMessageBox>
 #include <exception>
 #include "widgets.h"
 #include "picture_panel.h"
@@ -149,8 +150,14 @@ QPixmap PicturePanel::process_latex()
 
 void PicturePanel::open_project(QString fileName)
 {
-	chart_dialog->import(fileName.toStdString());
-	graph_dialog();
+	try {
+		chart_dialog->import(fileName.toStdString());
+		graph_dialog();
+		mw->setWindowTitle(mw->windowTitle().chopped(3));
+	}
+	catch (std::exception &e) {
+		QMessageBox::warning(this, "Import Error", e.what());
+	}
 }
 
 void PicturePanel::save_project(QString filename)
@@ -163,6 +170,8 @@ void PicturePanel::graph_dialog()
 {
 	auto elem = chart_dialog->getElements();
 	if (elem.has_value()) {
+		if (!mw->windowTitle().endsWith("[+]"))
+			mw->setWindowTitle(mw->windowTitle() + "[+]");
 		formula_lines = elem.value();
 		draw_new_equations();
 	}
