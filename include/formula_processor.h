@@ -1,4 +1,5 @@
 #pragma once
+#include <stdexcept>
 #include <vector>
 #include <string>
 #include <map>
@@ -14,10 +15,28 @@ enum class OperationType {
 	Div = '/',
 	Pow = '^',
 	Abs = '|',
-	Sign,
+	Tern = '?', // ternary operator: a ? b : c
+	Gr = '>',
+	Ls = '<',
+	And = 'A', // logical, &&
+	Or = 'O',  // logical, ||
+	Sign = 'S',
 };
 
+inline OperationType OType(const std::string &token)
+{
+	if (token.size() == 1)
+		return static_cast<OperationType>(token[0]);
+
+	if (token == "&&")
+		return OperationType::And;
+	if (token == "||")
+		return OperationType::Or;
+	throw std::runtime_error("Unknown operation token: " + token);
+}
+
 enum class OperandType {
+	NONE = -1,
 	Result, // Result of previous operation
 	Number,
 	Variable,
@@ -50,11 +69,12 @@ private:
 	std::vector<Operation> operations;
 
 	Operand operand(const std::string &formula);
-	Operation operation(OperationType op, std::string::size_type token_set,
-	                    const std::string &formula);
+	Operation operation(OperationType op, const std::string &token,
+	                    std::string::size_type pos, const std::string &formula);
 	std::string::size_type find_next_token(const std::string &formula,
-	                                       const std::string &token_set,
+	                                       const std::string &token,
 	                                       std::string::size_type pos = 0);
+
 	bool inside_section(const std::string &formula, std::string::size_type pos);
 
 public:

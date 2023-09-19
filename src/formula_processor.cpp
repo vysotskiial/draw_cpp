@@ -27,15 +27,16 @@ bool FormulaProcessor::inside_section(const string &f, string::size_type pos)
 	return (opened_cnt != closed_cnt) || (modulus_cnt % 2);
 }
 
-string::size_type FormulaProcessor::find_next_token(
-  const string &formula, const std::string &token_set, string::size_type pos)
+string::size_type FormulaProcessor::find_next_token(const string &formula,
+                                                    const std::string &token,
+                                                    string::size_type pos)
 {
-	auto token_pos = formula.find_first_of(token_set, pos + 1);
+	auto token_pos = formula.find(token, pos + 1);
 
 	while (token_pos != string::npos) {
 		if (!inside_section(formula, token_pos))
 			return token_pos;
-		token_pos = formula.find_first_of(token_set, token_pos + 1);
+		token_pos = formula.find(token, token_pos + 1);
 	}
 
 	return token_pos;
@@ -43,7 +44,7 @@ string::size_type FormulaProcessor::find_next_token(
 
 // Parsing operation arguments separated with specific token
 // Works for operations with single argument if token_pos == npos
-Operation FormulaProcessor::operation(OperationType type,
+Operation FormulaProcessor::operation(OperationType type, const string &token,
                                       string::size_type token_pos,
                                       const string &formula)
 {
@@ -53,8 +54,8 @@ Operation FormulaProcessor::operation(OperationType type,
 	  operand(formula.substr(prev_pos, token_pos - prev_pos)));
 
 	while (token_pos != string::npos) {
-		prev_pos = token_pos + 1;
-		token_pos = find_next_token(formula, {formula[token_pos]}, prev_pos);
+		prev_pos = token_pos + token.size();
+		token_pos = find_next_token(formula, token, prev_pos);
 		op.operands.push_back(
 		  operand(formula.substr(prev_pos, token_pos - prev_pos)));
 	}
@@ -67,22 +68,42 @@ Operand FormulaProcessor::operand(const std::string &formula)
 	if (formula[0] == '-')
 		return operand("0" + formula);
 
-	auto pos = find_next_token(formula, "+-");
+	// Condition operators are supposed to be isolated for there is no
+	// way of determining where they end
+	auto pos = find_next_token(formula, "?");
 	if (pos != string::npos) {
-		operations.push_back(
-		  operation(static_cast<OperationType>(formula[pos]), pos, formula));
+		auto pos1 = find_next_token(formula, ":");
+		if (pos1 == string::npos)
+			throw runtime_error("Incomplete ternary operator");
+		auto cond_op = operand(formula.substr(0, pos));
+		auto true_op = operand(formula.substr(pos + 1, pos1 - pos));
+		auto false_op = operand(formula.substr(pos1 + 1));
+		operations.push_back({OperationType::Tern, {cond_op, true_op, false_op}});
 		return {OperandType::Result, operations.size() - 1};
 	}
-	pos = find_next_token(formula, "*/");
+
+	pos = find_next_token(formula, "<");
+	pos = (pos != string::npos) ? pos : find_next_token(formula, ">");
 	if (pos != string::npos) {
-		operations.push_back(
-		  operation(static_cast<OperationType>(formula[pos]), pos, formula));
+		auto lhs = operand(formula.substr(0, pos));
+		auto rhs = operand(formula.substr(pos + 1));
+		operations.push_back({OType({formula[pos]}), {lhs, rhs}});
 		return {OperandType::Result, operations.size() - 1};
 	}
-	pos = find_next_token(formula, "^");
-	if (pos != string::npos) {
-		operations.push_back(operation(OperationType::Pow, pos, formula));
-		return {OperandType::Result, operations.size() - 1};
+
+	auto add_arithmetic = [&formula, this](const std::string &token) {
+		auto tpos = find_next_token(formula, token);
+		if (tpos != string::npos) {
+			operations.push_back(operation(OType(token), token, tpos, formula));
+			return Operand{OperandType::Result, operations.size() - 1};
+		}
+		return Operand{OperandType::NONE};
+	};
+
+	for (auto &token : {"&&"s, "||"s, "+"s, "-"s, "*"s, "/"s, "^"s}) {
+		auto op = add_arithmetic(token);
+		if (op.type != OperandType::NONE)
+			return op;
 	}
 
 	if (formula.front() == '(' && formula.back() == ')') {
@@ -91,14 +112,14 @@ Operand FormulaProcessor::operand(const std::string &formula)
 
 	if (formula.front() == '|' && formula.back() == '|') {
 		auto f = formula.substr(1, formula.size() - 2);
-		operations.push_back(operation(OperationType::Abs, string::npos, f));
+		operations.push_back(Operation{OperationType::Abs, {operand(f)}});
 
 		return {OperandType::Result, operations.size() - 1};
 	}
 
 	if (formula.starts_with("sign(")) {
 		auto f = formula.substr(5, formula.size() - 6); // strip sign()
-		operations.push_back(operation(OperationType::Sign, string::npos, f));
+		operations.push_back(Operation{OperationType::Sign, {operand(f)}});
 		return {OperandType::Result, operations.size() - 1};
 	}
 
@@ -166,6 +187,26 @@ double FormulaProcessor::operator()(const vector<double> &args,
 			results.push_back(value(operands[0]));
 			for (auto j = 1u; j < operands.size(); j++)
 				results.back() /= value(operands[j]);
+			break;
+		case OperationType::Or:
+			results.push_back(false);
+			for (auto operand : operands)
+				results.back() = results.back() || value(operand);
+			break;
+		case OperationType::And:
+			results.push_back(true);
+			for (auto operand : operands)
+				results.back() = results.back() && value(operand);
+			break;
+		case OperationType::Tern:
+			results.push_back(value(operands[0]) ? value(operands[1]) :
+			                                       value(operands[2]));
+			break;
+		case OperationType::Gr:
+			results.push_back(value(operands[0]) > value(operands[1]));
+			break;
+		case OperationType::Ls:
+			results.push_back(value(operands[0]) < value(operands[1]));
 			break;
 		case OperationType::Pow:
 			results.push_back(pow(value(operands[0]), value(operands[1])));

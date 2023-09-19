@@ -17,7 +17,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(IMAGES_INSTALLATION_PATH "/usr/local/share/draw_cpp")
 message(${IMAGES_INSTALLATION_PATH})
 
-add_library(symbolic_math symbolic_math/formula_processor.cpp)
+add_library(symbolic_math src/formula_processor.cpp)
 target_include_directories(symbolic_math PUBLIC include)
 set_target_properties(symbolic_math PROPERTIES PUBLIC_HEADER "include/formula_processor.h")
 
