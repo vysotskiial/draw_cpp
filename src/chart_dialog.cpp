@@ -111,7 +111,7 @@ vector<double> InitEdit::get() const
 {
 	vector<double> result;
 	transform(begin(edits), end(edits), back_inserter(result),
-	          [](auto edit) { return edit->text().toInt(); });
+	          [](auto edit) { return edit->text().toDouble(); });
 	return result;
 }
 

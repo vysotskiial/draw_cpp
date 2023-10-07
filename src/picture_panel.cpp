@@ -37,8 +37,8 @@ QChart *make_new_chart()
 	return new_chart;
 }
 
-PicturePanel::PicturePanel(MainWindow *parent, const SeriesVec &base)
-  : mw(parent), baseline(base)
+PicturePanel::PicturePanel(MainWindow *parent, const SeriesVec &base, bool grid)
+  : mw(parent), draw_grid{grid}, baseline(base)
 {
 	draw_new_equations();
 	setRubberBand(QChartView::RubberBand::NoRubberBand);
@@ -192,7 +192,10 @@ void PicturePanel::draw_new_equations()
 	}
 	new_chart->createDefaultAxes();
 	for (auto &axis : new_chart->axes()) {
-		((QValueAxis *)axis)->applyNiceNumbers();
+		if (draw_grid)
+			((QValueAxis *)axis)->applyNiceNumbers();
+		else
+			((QValueAxis *)axis)->setTickCount(2);
 	}
 	setChart(new_chart);
 	delete old_chart;

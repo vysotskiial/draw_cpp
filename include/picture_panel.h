@@ -18,6 +18,7 @@ struct Text {
 class PicturePanel : public QtCharts::QChartView {
 	MainWindow *mw;
 	bool making_cache{false};
+	bool draw_grid;
 	SeriesVec baseline; // Series provided not through
 	                    // formulas
 	QVector<Text> texts;
@@ -50,7 +51,7 @@ class PicturePanel : public QtCharts::QChartView {
 	void draw_new_equations();
 
 public:
-	PicturePanel(MainWindow *, const SeriesVec &);
+	PicturePanel(MainWindow *, const SeriesVec &, bool grid);
 	bool switch_zoom() { return zoom_mode = !zoom_mode; }
 	void graph_dialog();
 	void open_project(QString filename);

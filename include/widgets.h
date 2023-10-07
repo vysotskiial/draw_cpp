@@ -39,5 +39,5 @@ class MainWindow : public QWidget {
 public:
 	ControlPanel *control_panel;
 	PicturePanel *picture_panel;
-	MainWindow(QWidget *parent, const SeriesVec &baselines);
+	MainWindow(QWidget *parent, const SeriesVec &baselines, bool grid = false);
 };
