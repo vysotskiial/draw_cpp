@@ -177,12 +177,17 @@ void PicturePanel::save_project(QString filename)
 	ofs << setw(4) << js;
 }
 
+void PicturePanel::mark_unsaved()
+{
+	if (!mw->windowTitle().endsWith("[+]"))
+		mw->setWindowTitle(mw->windowTitle() + "[+]");
+}
+
 void PicturePanel::graph_dialog()
 {
 	auto elem = chart_dialog->getElements();
 	if (elem.has_value()) {
-		if (!mw->windowTitle().endsWith("[+]"))
-			mw->setWindowTitle(mw->windowTitle() + "[+]");
+		mark_unsaved();
 		formula_lines = elem.value();
 		draw_new_equations();
 	}
@@ -256,6 +261,7 @@ bool PicturePanel::input_latex(QPointF location)
 		texts[text_idx].font = doubleEdit->value();
 		texts[text_idx].coords = location;
 		texts[text_idx].pm = process_latex();
+		mark_unsaved();
 		return true;
 	}
 	return false;

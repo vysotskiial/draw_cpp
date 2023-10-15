@@ -67,6 +67,8 @@ class PicturePanel : public QtCharts::QChartView {
 	bool input_latex(QPointF location);
 	void draw_new_equations();
 
+	void mark_unsaved();
+
 public:
 	PicturePanel(MainWindow *, const SeriesVec &, bool grid);
 	bool switch_zoom() { return zoom_mode = !zoom_mode; }
