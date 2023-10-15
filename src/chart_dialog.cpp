@@ -249,7 +249,7 @@ QAbstractSeries *ChartDialogTab::get()
 	return series;
 }
 
-json ChartDialogTab::to_json() const
+ChartDialogTab::operator json() const
 {
 	json result;
 
@@ -272,10 +272,15 @@ json ChartDialogTab::to_json() const
 	return result;
 }
 
-void ChartDialogTab::from_json(json &j)
+void ChartDialogTab::from_json(const json &j)
 {
-	for (auto &[var, formula] : j["aux_vars"].items())
-		aux_edit->add(QString::fromStdString(var), QString::fromStdString(formula));
+	try {
+		for (auto &[var, formula] : j.at("aux_vars").get<json::object_t>())
+			aux_edit->add(QString::fromStdString(var),
+			              QString::fromStdString(formula));
+	}
+	catch (std::exception &) { // not haveing aux variables isn't an error
+	}
 
 	for (auto &eq : j["equations"])
 		equations_edit->add(QString::fromStdString(eq));
@@ -355,22 +360,17 @@ void ChartDialog::rm_tab()
 	delete tab;
 }
 
-void ChartDialog::save(const string &filename) const
+ChartDialog::operator json() const
 {
-	ofstream ostr(filename);
 	json result;
 	for (auto &tab : tabs)
-		result["charts"].push_back(tab->to_json());
+		result["charts"].push_back(*tab);
 
-	ostr << setw(4) << result;
+	return result;
 }
 
-void ChartDialog::import(const string &filename)
+void ChartDialog::import(const json &info)
 {
-	ifstream ifs(filename);
-	json info;
-	ifs >> info;
-
 	for (auto i = 0; i < tabs.size(); i++)
 		rm_tab();
 

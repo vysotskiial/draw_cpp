@@ -13,6 +13,23 @@ struct Text {
 	QPixmap pm;
 	QString text;
 	double font{default_font};
+
+	operator nlohmann::json() const
+	{
+		nlohmann::json data;
+		data["x"] = coords.x();
+		data["y"] = coords.y();
+		data["text"] = text.toStdString();
+		data["font"] = font;
+
+		return data;
+	}
+	Text(const nlohmann::json &j)
+	  : coords(j["x"], j["y"]), text(j["text"].get<std::string>().c_str()),
+	    font(j["font"])
+	{
+	}
+	Text() = default;
 };
 
 class PicturePanel : public QtCharts::QChartView {
@@ -47,7 +64,7 @@ class PicturePanel : public QtCharts::QChartView {
 	void find_text(QPoint pos); // check if there's latex text under mouse
 
 	QPixmap process_latex();
-	bool input_latex();
+	bool input_latex(QPointF location);
 	void draw_new_equations();
 
 public:

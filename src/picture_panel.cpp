@@ -15,6 +15,7 @@
 #include <QScreen>
 #include <QMessageBox>
 #include <exception>
+#include <fstream>
 #include "widgets.h"
 #include "picture_panel.h"
 #include "solver.h"
@@ -130,12 +131,8 @@ void PicturePanel::mouseDoubleClickEvent(QMouseEvent *e)
 	if (text_idx == -1)
 		return;
 
-	if (!input_latex()) {
-		return;
-	}
-	texts[text_idx].pm = process_latex();
-	texts[text_idx].coords = widget2chart(e->pos() - mouse_text_offset);
-	viewport()->update();
+	if (input_latex(widget2chart(e->pos() - mouse_text_offset)))
+		viewport()->update();
 }
 
 QPixmap PicturePanel::process_latex()
@@ -150,8 +147,18 @@ QPixmap PicturePanel::process_latex()
 
 void PicturePanel::open_project(QString fileName)
 {
+	texts.clear();
+	text_idx = 0;
 	try {
-		chart_dialog->import(fileName.toStdString());
+		ifstream ifs(fileName.toStdString());
+		nlohmann::json info;
+		ifs >> info;
+		for (auto &latex : info["latex"]) {
+			texts.push_back(latex);
+			texts[text_idx++].pm = process_latex();
+		}
+
+		chart_dialog->import(info);
 		graph_dialog();
 		mw->setWindowTitle(mw->windowTitle().chopped(3));
 	}
@@ -162,8 +169,12 @@ void PicturePanel::open_project(QString fileName)
 
 void PicturePanel::save_project(QString filename)
 {
-	// TODO save and import latex
-	chart_dialog->save(filename.toStdString());
+	ofstream ofs(filename.toStdString());
+	auto js = nlohmann::json(*chart_dialog);
+	for (auto text : texts)
+		js["latex"].push_back(text);
+
+	ofs << setw(4) << js;
 }
 
 void PicturePanel::graph_dialog()
@@ -201,7 +212,7 @@ void PicturePanel::draw_new_equations()
 	delete old_chart;
 }
 
-bool PicturePanel::input_latex()
+bool PicturePanel::input_latex(QPointF location)
 {
 	QDialog dialog(this);
 	QFormLayout form(&dialog);
@@ -243,6 +254,8 @@ bool PicturePanel::input_latex()
 		}
 		texts[text_idx].text = lineEdit->text();
 		texts[text_idx].font = doubleEdit->value();
+		texts[text_idx].coords = location;
+		texts[text_idx].pm = process_latex();
 		return true;
 	}
 	return false;
@@ -255,19 +268,10 @@ void PicturePanel::mouseReleaseEvent(QMouseEvent *e)
 
 	mouse_pressed = false;
 
-	if (zoom_mode) {
+	if (zoom_mode)
 		chart()->zoomIn(QRectF{zoom_start, zoom_end}.normalized());
-	}
-	else if (text_idx == -1) {
-		auto ok = input_latex();
-		if (ok) {
-			texts[text_idx].coords = widget2chart(e->pos());
-			texts[text_idx].pm = process_latex();
-		}
-	}
-	else {
-		return;
-	}
+	else if (text_idx == -1)
+		input_latex(widget2chart(e->pos()));
 	viewport()->update();
 }
 

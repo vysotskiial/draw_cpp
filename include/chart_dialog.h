@@ -79,8 +79,8 @@ public:
 	void comp_added(const QString &num);
 	void comp_removed();
 	QtCharts::QAbstractSeries *get();
-	nlohmann::json to_json() const;
-	void from_json(nlohmann::json &j);
+	operator nlohmann::json() const;
+	void from_json(const nlohmann::json &j);
 
 	ChartDialogTab(QWidget *p);
 };
@@ -95,8 +95,8 @@ private:
 
 public:
 	std::optional<SeriesVec> getElements();
-	void save(const std::string &filename) const;
-	void import(const std::string &filename);
+	operator nlohmann::json() const;
+	void import(const nlohmann::json &j);
 
 	ChartDialog(QWidget *p);
 };

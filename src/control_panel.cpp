@@ -47,6 +47,8 @@ ControlPanel::ControlPanel(MainWindow *parent): QWidget(parent), mw(parent)
 	connect(save, &QShortcut::activated, this, [this]() {
 		if (save_file.size())
 			this->save(save_file);
+		else
+			on_save();
 	});
 
 	auto layout = new QHBoxLayout(this);
