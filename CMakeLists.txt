@@ -30,16 +30,17 @@ target_include_directories(drawing PUBLIC ${INCLUDES_PATH} /usr/include/klftools
 target_link_libraries(drawing PUBLIC Qt5::Widgets Qt5::Charts klfbackend nlohmann_json::nlohmann_json)
 
 
-add_executable(graph_test test/main.cpp)
-target_link_libraries(graph_test PRIVATE drawing symbolic_math)
+add_executable(drawcpp src/main.cpp)
+target_link_libraries(drawcpp PRIVATE drawing symbolic_math)
 
 add_executable(symbolic_math_test test/symbols_test.cpp)
 target_link_libraries(symbolic_math_test symbolic_math GTest::GTest)
 
-install(TARGETS drawing symbolic_math
+install(TARGETS drawing symbolic_math drawcpp
         EXPORT drawcpp
         ARCHIVE DESTINATION lib/draw_cpp
         PUBLIC_HEADER DESTINATION include/draw_cpp
+        RUNTIME DESTINATION bin
 )
 install(EXPORT drawcpp DESTINATION lib/cmake)
 install(FILES cmake/drawcppConfig.cmake DESTINATION lib/cmake)
