@@ -27,7 +27,7 @@ add_library(drawing src/picture_panel.cpp src/control_panel.cpp include/widgets.
 target_compile_definitions(drawing PRIVATE IMAGES_PATH="${IMAGES_INSTALLATION_PATH}")
 set_target_properties(drawing PROPERTIES PUBLIC_HEADER "include/widgets.h;include/solver.h")
 target_include_directories(drawing PUBLIC ${INCLUDES_PATH} /usr/include/klftools /usr/include/klfbackend)
-target_link_libraries(drawing PUBLIC Qt5::Widgets Qt5::Charts klfbackend nlohmann_json::nlohmann_json)
+target_link_libraries(drawing PUBLIC Qt5::Widgets Qt5::Charts klfbackend nlohmann_json::nlohmann_json symbolic_math)
 
 
 add_executable(drawcpp src/main.cpp)
