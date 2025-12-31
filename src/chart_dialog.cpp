@@ -4,7 +4,6 @@
 #include <QMessageBox>
 #include <QApplication>
 #include <QSplineSeries>
-#include <fstream>
 #include "chart_dialog.h"
 #include "solver.h"
 
@@ -198,15 +197,23 @@ ChartDialogTab::ChartDialogTab(QWidget *parent): QWidget(parent)
 bool ChartDialogTab::check()
 {
 	vp = {};
+	auto i = 1z;
+	QString var_name;
 	try {
-		for (auto &eq : equations_edit->get())
-			vp.add_comp(eq.toStdString());
-		for (auto &[name, eq] : aux_edit->get())
+		for (auto &eq : equations_edit->get()) {
+			var_name = QString("%1%2").arg(default_variable).arg(i);
+			vp[i++] = eq.toStdString();
+		}
+		for (auto &[name, eq] : aux_edit->get()) {
+			var_name = name;
 			vp[name.toStdString()] = eq.toStdString();
+		}
 	}
 	catch (exception &e) {
-		// TODO location of error
-		QMessageBox::warning(this, "Error", "Wrong equation format");
+		auto err_msg = QString("Wrong equation format for variable %1:\n %2")
+		                 .arg(var_name)
+		                 .arg(e.what());
+		QMessageBox::warning(this, "Error", err_msg);
 		return false;
 	}
 
@@ -227,7 +234,8 @@ QAbstractSeries *ChartDialogTab::get()
 		solution = solver.solve();
 	}
 	catch (exception &e) {
-		QMessageBox::warning(this, "Error", "Wrong equation format");
+		QMessageBox::warning(this, "Error",
+		                     "Wrong equation format: " + QString(e.what()));
 		return nullptr;
 	}
 	auto series = new QSplineSeries();

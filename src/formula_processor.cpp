@@ -1,15 +1,14 @@
 #include <algorithm>
-#include <iostream>
+#include <cassert>
 #include <cmath>
-#include <numeric>
-#include <sstream>
+#include <print>
 #include "formula_processor.h"
 
 using namespace std;
 
-FormulaProcessor::FormulaProcessor(const string &f)
+FormulaProcessor::FormulaProcessor(string formula, VectorProcessor *vp)
+  : owner(vp)
 {
-	auto formula = f;
 	formula.erase(remove(formula.begin(), formula.end(), ' '), formula.end());
 	auto op = operand(formula);
 	// Means formula is trivial i.e. no operations there
@@ -17,8 +16,19 @@ FormulaProcessor::FormulaProcessor(const string &f)
 		trivial_operand = op;
 }
 
+FormulaProcessor &FormulaProcessor::operator=(string formula)
+{
+	operations.clear();
+	formula.erase(remove(formula.begin(), formula.end(), ' '), formula.end());
+	auto op = operand(formula);
+	// Means formula is trivial i.e. no operations there
+	if (op.type != OperandType::Result)
+		trivial_operand = op;
+	return *this;
+}
+
 // Is position inside either () or ||
-bool FormulaProcessor::inside_section(const string &f, string::size_type pos)
+bool FormulaProcessor::inside_section(string_view f, string::size_type pos)
 {
 	auto opened_cnt = count(f.begin(), f.begin() + pos, '(');
 	auto closed_cnt = count(f.begin(), f.begin() + pos, ')');
@@ -27,8 +37,8 @@ bool FormulaProcessor::inside_section(const string &f, string::size_type pos)
 	return (opened_cnt != closed_cnt) || (modulus_cnt % 2);
 }
 
-string::size_type FormulaProcessor::find_next_token(const string &formula,
-                                                    const std::string &token,
+string::size_type FormulaProcessor::find_next_token(string_view formula,
+                                                    string_view token,
                                                     string::size_type pos)
 {
 	auto token_pos = formula.find(token, pos + 1);
@@ -44,9 +54,9 @@ string::size_type FormulaProcessor::find_next_token(const string &formula,
 
 // Parsing operation arguments separated with specific token
 // Works for operations with single argument if token_pos == npos
-Operation FormulaProcessor::operation(OperationType type, const string &token,
+Operation FormulaProcessor::operation(OperationType type, string_view token,
                                       string::size_type token_pos,
-                                      const string &formula)
+                                      string_view formula)
 {
 	Operation op{type};
 	string::size_type prev_pos = 0;
@@ -62,36 +72,41 @@ Operation FormulaProcessor::operation(OperationType type, const string &token,
 	return op;
 }
 
-Operand FormulaProcessor::operand(const std::string &formula)
+Operand FormulaProcessor::operand(string_view formula)
 {
-	// cerr << formula << '\n';
-	if (formula[0] == '-')
-		return operand("0" + formula);
+	if (formula[0] == '-') {
+		// -formula == 0 - formula => create that operation
+		Operand zero = {.type = OperandType::Number, .value = 0.};
+		Operand other = operand(formula.substr(1));
+		operations.push_back({OperationType::Minus, {zero, other}});
+		return Operand{OperandType::Result, operations.size() - 1};
+	}
 
 	// Condition operators are supposed to be isolated for there is no
 	// way of determining where they end
-	auto pos = find_next_token(formula, "?");
-	if (pos != string::npos) {
-		auto pos1 = find_next_token(formula, ":");
-		if (pos1 == string::npos)
+	auto pos_question = find_next_token(formula, "?");
+	if (pos_question != string::npos) {
+		auto pos_colon = find_next_token(formula, ":");
+		if (pos_colon == string::npos)
 			throw runtime_error("Incomplete ternary operator");
-		auto cond_op = operand(formula.substr(0, pos));
-		auto true_op = operand(formula.substr(pos + 1, pos1 - pos));
-		auto false_op = operand(formula.substr(pos1 + 1));
+		auto cond_op = operand(formula.substr(0, pos_question));
+		auto true_op =
+		  operand(formula.substr(pos_question + 1, pos_colon - pos_question - 1));
+		auto false_op = operand(formula.substr(pos_colon + 1));
 		operations.push_back({OperationType::Tern, {cond_op, true_op, false_op}});
 		return {OperandType::Result, operations.size() - 1};
 	}
 
-	pos = find_next_token(formula, "<");
-	pos = (pos != string::npos) ? pos : find_next_token(formula, ">");
-	if (pos != string::npos) {
-		auto lhs = operand(formula.substr(0, pos));
-		auto rhs = operand(formula.substr(pos + 1));
-		operations.push_back({OType({formula[pos]}), {lhs, rhs}});
+	auto pos_cmp = find_next_token(formula, "<");
+	pos_cmp = (pos_cmp != string::npos) ? pos_cmp : find_next_token(formula, ">");
+	if (pos_cmp != string::npos) {
+		auto lhs = operand(formula.substr(0, pos_cmp));
+		auto rhs = operand(formula.substr(pos_cmp + 1));
+		operations.push_back({OType(formula.substr(pos_cmp, 1)), {lhs, rhs}});
 		return {OperandType::Result, operations.size() - 1};
 	}
 
-	auto add_arithmetic = [&formula, this](const std::string &token) {
+	auto add_arithmetic = [&formula, this](string_view token) {
 		auto tpos = find_next_token(formula, token);
 		if (tpos != string::npos) {
 			operations.push_back(operation(OType(token), token, tpos, formula));
@@ -100,56 +115,61 @@ Operand FormulaProcessor::operand(const std::string &formula)
 		return Operand{OperandType::NONE};
 	};
 
-	for (auto &token : {"&&"s, "||"s, "+"s, "-"s, "*"s, "/"s, "^"s}) {
+	for (auto &token : {"&&", "||", "+", "-", "*", "/", "^"}) {
 		auto op = add_arithmetic(token);
 		if (op.type != OperandType::NONE)
 			return op;
 	}
 
-	if (formula.front() == '(' && formula.back() == ')') {
+	if (formula.front() == '(' && formula.back() == ')')
 		return operand(formula.substr(1, formula.size() - 2));
-	}
 
 	if (formula.front() == '|' && formula.back() == '|') {
 		auto f = formula.substr(1, formula.size() - 2);
 		operations.push_back(Operation{OperationType::Abs, {operand(f)}});
 
-		return {OperandType::Result, operations.size() - 1};
+		return {.type = OperandType::Result, .idx = operations.size() - 1};
 	}
 
+	// TODO more functions with some cool template/std::func mappings
 	if (formula.starts_with("sign(")) {
 		auto f = formula.substr(5, formula.size() - 6); // strip sign()
 		operations.push_back(Operation{OperationType::Sign, {operand(f)}});
-		return {OperandType::Result, operations.size() - 1};
+		return {.type = OperandType::Result, .idx = operations.size() - 1};
 	}
 
-	if (formula.starts_with(variable)) {
-		auto idx = stoul(formula.substr(1));
-		return {OperandType::Variable, idx - 1};
-	}
+	auto idx = is_component(formula);
+	if (idx >= 0)
+		return {.type = OperandType::Variable, .idx = size_t(idx)};
 
-	// Should be a number or aux variable.
-	try {
-		return {OperandType::Number, 0, stod(formula)};
-	}
-	catch (std::exception &e) {
-	}
+	char *num_end;
+	auto num_value = strtod(begin(formula), &num_end);
+	if (num_end == end(formula))
+		return {.type = OperandType::Number, .value = num_value};
 
-	return {OperandType::AuxVariable, 0, 0, formula};
+	if (!isalpha(formula[0]))
+		throw std::invalid_argument("Invalid operand: " + string{formula});
+
+	return {.type = OperandType::AuxVariable, .aux_variable = string{formula}};
 }
 
-double FormulaProcessor::operator()(const vector<double> &args,
-                                    VectorProcessor *vp)
+double FormulaProcessor::operator()(const vector<double> &args)
 {
 	vector<double> results;
-	auto value = [&args, &results, &vp](const Operand &o) {
+	auto value = [&args, &results, this](const Operand &o) {
 		switch (o.type) {
 		case OperandType::AuxVariable:
-			if (!vp || !vp->is_aux_var(o.variable)) {
-				cerr << o.variable << '\n';
-				throw runtime_error("Aux variable failure");
-			}
-			return vp->variables.at(o.variable);
+			if (!is_aux_var(o.aux_variable))
+				throw runtime_error("Aux variable failure for " + o.aux_variable);
+			if (owner->calculated_aux.contains(o.aux_variable))
+				return owner->calculated_aux[o.aux_variable];
+			if (owner->current_aux.contains(o.aux_variable))
+				throw runtime_error("Circular definition of aux variable " +
+				                    o.aux_variable);
+			owner->current_aux.insert(o.aux_variable);
+			owner->calculated_aux[o.aux_variable] =
+			  owner->aux_variables[o.aux_variable](args);
+			return owner->calculated_aux[o.aux_variable];
 		case OperandType::Number:
 			return o.value;
 		case OperandType::Result:
@@ -226,13 +246,46 @@ double FormulaProcessor::operator()(const vector<double> &args,
 vector<double> VectorProcessor::operator()(const vector<double> &args)
 {
 	vector<double> result;
-	for (auto &[name, aux_proc] : aux_variables) {
-		variables[name] = aux_proc(args, this);
-	}
+	current_aux.clear();
+	calculated_aux.clear();
 
-	for (auto &component : components) {
-		result.push_back(component(args, this));
-	}
+	for (auto &component : components)
+		result.push_back(component(args));
 
 	return result;
+}
+
+FormulaProcessor &VectorProcessor::operator[](size_t i)
+{
+	assert(i && "Vector processor uses indexing with i > 0");
+	if (components.size() < i)
+		components.resize(i, {""s, this});
+	return components[i - 1];
+}
+
+FormulaProcessor &VectorProcessor::operator[](const std::string &name)
+{
+	if (!aux_variables.contains(name))
+		aux_variables.insert({name, {"", this}});
+	return aux_variables[name];
+}
+
+int FormulaProcessor::is_component(string_view name) const
+{
+	if (!name.starts_with(default_variable))
+		return -1;
+
+	auto num_sv = name.substr(sizeof(default_variable) - 1);
+	char *num_end;
+	auto num = strtol(begin(num_sv), &num_end, 10);
+	if (num_end != end(num_sv))
+		return -1;
+	return num - 1;
+}
+
+bool FormulaProcessor::is_aux_var(const string &name) const
+{
+	if (!owner)
+		return false;
+	return owner->is_aux_var(name);
 }
