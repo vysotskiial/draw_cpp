@@ -16,7 +16,6 @@
 
 class MainWindow;
 class PicturePanel;
-using SeriesVec = QVector<QtCharts::QAbstractSeries *>;
 
 class ControlPanel : public QWidget {
 	Q_OBJECT
@@ -39,5 +38,5 @@ class MainWindow : public QWidget {
 public:
 	ControlPanel *control_panel;
 	PicturePanel *picture_panel;
-	MainWindow(QWidget *parent, const SeriesVec &baselines, bool grid = false);
+	MainWindow(QWidget *parent);
 };

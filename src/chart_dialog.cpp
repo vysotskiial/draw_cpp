@@ -13,7 +13,6 @@ using namespace nlohmann;
 
 AuxVarItem::AuxVarItem(QVBoxLayout *o, const QString &n, const QString &f)
 {
-	static QString im_path = IMAGES_PATH;
 	auto layout = new QHBoxLayout(this);
 	name_edit = new QLineEdit(n);
 	formula_edit = new QLineEdit(f);
@@ -94,6 +93,64 @@ QVector<QString> EquationsEdit::get() const
 	return result;
 }
 
+ComponentChoice::PairEdit::PairEdit(ComponentChoice *parent, QComboBox *base)
+  : x(new QComboBox(parent)), y(new QComboBox(parent)),
+    button(new QPushButton(QIcon(im_path + "/images/"
+                                           "delete.png"),
+                           ""))
+{
+	if (!base) {
+		x->addItem("t");
+		y->addItem("t");
+		return;
+	}
+	for (auto i = 0; i < base->count(); i++) {
+		x->addItem(base->itemText(i));
+		y->addItem(base->itemText(i));
+	}
+}
+
+void ComponentChoice::add_pair()
+{
+	auto row_layout = new QHBoxLayout();
+	edits.push_back({this, edits.size() ? edits.front().x : nullptr});
+	row_layout->addWidget(new QLabel("x: "));
+	row_layout->addWidget(edits.back().x);
+	row_layout->addWidget(new QLabel("y: "));
+	row_layout->addWidget(edits.back().y);
+	row_layout->addStretch();
+	row_layout->addWidget(edits.back().button);
+	connect(edits.back().button, &QPushButton::released, [row_layout, this]() {
+		if (edits.size() == 1)
+			return;
+		layout->removeItem(row_layout);
+		edits.pop_back();
+	});
+	layout->addLayout(row_layout);
+}
+
+void ComponentChoice::comp_removed()
+{
+	for (auto &edit : edits) {
+		edit.x->removeItem(edit.x->count() - 1);
+		edit.y->removeItem(edit.y->count() - 1);
+	}
+}
+
+void ComponentChoice::comp_added(const QString &num)
+{
+	for (auto &edit : edits) {
+		edit.x->addItem("x" + num);
+		edit.y->addItem("x" + num);
+	}
+}
+
+ComponentChoice::ComponentChoice(QWidget *parent): QWidget(parent)
+{
+	layout = new QVBoxLayout(this);
+	add_pair();
+}
+
 InitEdit::InitEdit(QWidget *parent): QDialog(parent)
 {
 	layout = new QFormLayout(this);
@@ -120,16 +177,14 @@ void ChartDialogTab::comp_added(const QString &num)
 	init_edit->edits.push_back(new QLineEdit);
 	init_edit->layout->insertRow(init_edit->layout->rowCount() - 1,
 	                             comp + "(0) = ", init_edit->edits.back());
-	x_comp_edit->addItem(comp);
-	y_comp_edit->addItem(comp);
+	comp_choice->comp_added(num);
 	init_button->setStyleSheet("QPushButton {color: red;}");
 	init_value.clear();
 }
 
 void ChartDialogTab::comp_removed()
 {
-	x_comp_edit->removeItem(x_comp_edit->count() - 1);
-	y_comp_edit->removeItem(y_comp_edit->count() - 1);
+	comp_choice->comp_removed();
 	delete init_edit->edits.back();
 	init_edit->edits.pop_back();
 	init_edit->layout->removeRow(init_edit->layout->rowCount() - 2);
@@ -166,20 +221,18 @@ ChartDialogTab::ChartDialogTab(QWidget *parent): QWidget(parent)
 	steps_num_edit->setMaximum(1e9);
 	steps_num_edit->setValue(1e4);
 	auto steps_layout = new QHBoxLayout();
+	steps_layout->addWidget(new QLabel("Step size:"));
 	steps_layout->addWidget(step_edit);
+	steps_layout->addWidget(new QLabel("Steps num:"));
 	steps_layout->addWidget(steps_num_edit);
-	form->addRow("Step and step number:", steps_layout);
+	form->addRow(steps_layout);
 
-	x_comp_edit = new QComboBox(this);
-	y_comp_edit = new QComboBox(this);
-	x_comp_edit->addItem("t");
-	y_comp_edit->addItem("t");
-	auto comps_layout = new QHBoxLayout();
-	comps_layout->addWidget(new QLabel("x"));
-	comps_layout->addWidget(x_comp_edit);
-	comps_layout->addWidget(new QLabel("y"));
-	comps_layout->addWidget(y_comp_edit);
-	form->addRow("Axis:", comps_layout);
+	comp_choice = new ComponentChoice(this);
+	form->addRow("Axis:", comp_choice);
+	auto add_axis = new QPushButton("Add Axis", this);
+	connect(add_axis, &QPushButton::released,
+	        [this]() { comp_choice->add_pair(); });
+	form->addRow(add_axis);
 
 	QPixmap icon_map(100, 100);
 	icon_map.fill(color);
@@ -220,11 +273,11 @@ bool ChartDialogTab::check()
 	return true;
 }
 
-QAbstractSeries *ChartDialogTab::get()
+void ChartDialogTab::get(SeriesInfo &info)
 {
 	if (!init_value.size()) {
 		QMessageBox::warning(this, "Error", "Initial conditions not set");
-		return nullptr;
+		return;
 	}
 	auto step = step_edit->value();
 	auto steps_num = steps_num_edit->value();
@@ -236,25 +289,31 @@ QAbstractSeries *ChartDialogTab::get()
 	catch (exception &e) {
 		QMessageBox::warning(this, "Error",
 		                     "Wrong equation format: " + QString(e.what()));
-		return nullptr;
+		return;
 	}
-	auto series = new QSplineSeries();
 
-	auto pen = series->pen();
-	pen.setWidth(2);
-	pen.setColor(color);
-	series->setPen(pen);
+	for (auto i = 0; i < comp_choice->comps_size(); i++) {
+		auto series = new QSplineSeries();
+		auto pen = series->pen();
+		pen.setWidth(2);
+		pen.setColor(color);
+		series->setPen(pen);
 
-	auto x_comp = x_comp_edit->currentIndex() - 1;
-	auto y_comp = y_comp_edit->currentIndex() - 1;
+		auto comp_pair = comp_choice->getComps(i);
+		auto x_comp = comp_pair.x_comp;
+		auto y_comp = comp_pair.y_comp;
 
-	auto get_value = [&solution, step](int comp, int k) {
-		return (comp == -1) ? k * step : solution[k][comp];
-	};
-	for (auto k = 0u; k < solution.size(); k++)
-		series->append({get_value(x_comp, k), get_value(y_comp, k)});
+		auto get_value = [&solution, step](int comp, int k) {
+			return (comp == -1) ? k * step : solution[k][comp];
+		};
+		for (auto k = 0u; k < solution.size(); k++)
+			series->append({get_value(x_comp, k), get_value(y_comp, k)});
 
-	return series;
+		auto comp_name = [](int comp) {
+			return (comp == -1) ? "t" : "x_" + QString::number(comp);
+		};
+		info[comp_name(x_comp) + "/" + comp_name(y_comp)].append(series);
+	}
 }
 
 ChartDialogTab::operator json() const
@@ -273,8 +332,8 @@ ChartDialogTab::operator json() const
 	result["step"] = step_edit->value();
 	result["steps_num"] = steps_num_edit->value();
 
-	result["x_comp"] = x_comp_edit->currentIndex();
-	result["y_comp"] = y_comp_edit->currentIndex();
+	result["x_comp"] = comp_choice->getComps(0).x_comp;
+	result["y_comp"] = comp_choice->getComps(0).y_comp;
 
 	result["color"] = color.name().toStdString();
 	return result;
@@ -302,29 +361,23 @@ void ChartDialogTab::from_json(const json &j)
 	step_edit->setValue(j["step"]);
 	steps_num_edit->setValue(j["steps_num"]);
 
-	x_comp_edit->setCurrentIndex(j["x_comp"].get<int>());
-	y_comp_edit->setCurrentIndex(j["y_comp"].get<int>());
-
 	color = QColor(j["color"].get<string>().c_str());
 	QPixmap pixmap(100, 100);
 	pixmap.fill(color);
 	color_button->setIcon(QIcon(pixmap));
 }
 
-std::optional<SeriesVec> ChartDialog::getElements()
+SeriesInfo ChartDialog::getElements()
 {
 	if (!just_imported && exec() != QDialog::Accepted)
 		return {};
 
 	just_imported = false;
-	SeriesVec result;
+	SeriesInfo result;
 	for (auto &tab : tabs) {
 		if (!tab->check())
 			return {};
-		auto series = tab->get();
-		if (!series)
-			return {};
-		result.push_back(series);
+		tab->get(result);
 	}
 
 	return result;

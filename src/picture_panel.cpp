@@ -16,37 +16,44 @@
 #include <QMessageBox>
 #include <exception>
 #include <fstream>
+#include <print>
 #include "widgets.h"
 #include "picture_panel.h"
-#include "solver.h"
-#include "formula_processor.h"
 
 using namespace std;
 using namespace QtCharts;
 
-QChart *make_new_chart()
+void PicturePanel::add_chart(QString label,
+                             const QVector<QAbstractSeries *> &series)
 {
-	auto *new_chart = new QChart();
-	new_chart->legend()->setVisible(true);
-
+	auto chart_view = new PictureTab(this);
+	chart_view->setRubberBand(QChartView::RubberBand::NoRubberBand);
+	chart_view->setRenderHint(QPainter::Antialiasing);
+	auto chart = chart_view->chart();
+	chart->legend()->setVisible(true);
 	auto x_axis = new QValueAxis();
 	x_axis->setLinePen(Qt::PenStyle::SolidLine);
 
 	auto y_axis = new QValueAxis;
 	y_axis->setLinePen(Qt::PenStyle::SolidLine);
+	for (auto &s : series)
+		chart->addSeries(s);
 
-	return new_chart;
+	auto idx = tabs->addTab(chart_view, label);
+	tab2chart[idx] = chart_view;
+	chart->createDefaultAxes();
+	for (auto &axis : chart->axes()) {
+		if (draw_grid)
+			((QValueAxis *)axis)->applyNiceNumbers();
+		else
+			((QValueAxis *)axis)->setTickCount(2);
+	}
 }
 
-PicturePanel::PicturePanel(MainWindow *parent, const SeriesVec &base, bool grid)
-  : mw(parent), draw_grid{grid}, baseline(base)
+PictureTab::PictureTab(PicturePanel *o): QtCharts::QChartView(o), owner(o)
 {
-	draw_new_equations();
-	setRubberBand(QChartView::RubberBand::NoRubberBand);
-	setRenderHint(QPainter::Antialiasing);
 	setMouseTracking(true);
 	setMinimumSize(500, 500);
-
 	bool ok = KLFBackend::detectSettings(&settings);
 	if (!ok) {
 		// vital program not found
@@ -57,11 +64,19 @@ PicturePanel::PicturePanel(MainWindow *parent, const SeriesVec &base, bool grid)
 	input.mathmode = "\\begin{equation*} ... \\end{equation*}";
 	input.preamble = "\\usepackage{amsmath}\n";
 	input.dpi = 300;
+}
+
+PicturePanel::PicturePanel(MainWindow *parent): mw(parent), draw_grid{false}
+{
+	tabs = new QTabWidget(this);
+	auto layout = new QHBoxLayout(this);
+	layout->addWidget(tabs);
+	add_chart("", {});
 
 	chart_dialog = new ChartDialog(this);
 }
 
-void PicturePanel::paintEvent(QPaintEvent *e)
+void PictureTab::paintEvent(QPaintEvent *e)
 {
 	if (making_cache || !mouse_pressed) {
 		QChartView::paintEvent(e);
@@ -81,20 +96,20 @@ void PicturePanel::paintEvent(QPaintEvent *e)
 		painter.drawPixmap(coords.x(), coords.y(), text.pm);
 	}
 
-	if (mouse_pressed && zoom_mode) {
+	if (mouse_pressed && owner->zoom_mode) {
 		painter.setPen(Qt::PenStyle::DashLine);
 		painter.drawRect(QRect{zoom_start, zoom_end});
 	}
 }
 
-void PicturePanel::mousePressEvent(QMouseEvent *e)
+void PictureTab::mousePressEvent(QMouseEvent *e)
 {
 	if (e->button() != Qt::LeftButton)
 		return;
 
 	mouse_pressed = true;
 
-	if (zoom_mode) {
+	if (owner->zoom_mode) {
 		auto screen = QApplication::primaryScreen();
 		cached_graph = screen->grabWindow(winId());
 		zoom_start = e->pos();
@@ -108,9 +123,8 @@ void PicturePanel::mousePressEvent(QMouseEvent *e)
 	}
 }
 
-void PicturePanel::find_text(QPoint pos)
+void PictureTab::find_text(QPoint pos)
 {
-	text_idx = -1;
 	for (auto i = 0; i < texts.size(); i++) {
 		auto coords = chart2widget({texts[i].coords});
 		auto text_rect = QRect(coords, texts[i].pm.size());
@@ -120,11 +134,12 @@ void PicturePanel::find_text(QPoint pos)
 			return;
 		}
 	}
+	text_idx = -1;
 }
 
-void PicturePanel::mouseDoubleClickEvent(QMouseEvent *e)
+void PictureTab::mouseDoubleClickEvent(QMouseEvent *e)
 {
-	if (zoom_mode)
+	if (owner->zoom_mode)
 		return;
 
 	find_text(e->pos());
@@ -135,7 +150,7 @@ void PicturePanel::mouseDoubleClickEvent(QMouseEvent *e)
 		viewport()->update();
 }
 
-QPixmap PicturePanel::process_latex()
+QPixmap PictureTab::process_latex()
 {
 	input.latex = texts[text_idx].text;
 	input.fontsize = texts[text_idx].font;
@@ -147,20 +162,20 @@ QPixmap PicturePanel::process_latex()
 
 void PicturePanel::open_project(QString fileName)
 {
-	texts.clear();
-	text_idx = 0;
+	tab2chart.clear();
 	try {
 		ifstream ifs(fileName.toStdString());
 		nlohmann::json info;
 		ifs >> info;
-		for (auto &latex : info["latex"]) {
-			texts.push_back(latex);
-			texts[text_idx++].pm = process_latex();
-		}
 
 		chart_dialog->import(info);
 		graph_dialog();
 		mw->setWindowTitle(mw->windowTitle().chopped(3));
+		// TODO
+		// for (auto &latex : info["latex"]) {
+		//  content()->texts.push_back(latex);
+		//  content()->texts[text_idx++].pm = process_latex();
+		//}
 	}
 	catch (std::exception &e) {
 		QMessageBox::warning(this, "Import Error", e.what());
@@ -169,10 +184,13 @@ void PicturePanel::open_project(QString fileName)
 
 void PicturePanel::save_project(QString filename)
 {
+	// FIXME save all charts
 	ofstream ofs(filename.toStdString());
 	auto js = nlohmann::json(*chart_dialog);
-	for (auto text : texts)
-		js["latex"].push_back(text);
+
+	// TODO
+	// for (auto text : content()->texts)
+	// js["latex"].push_back(text);
 
 	ofs << setw(4) << js;
 }
@@ -185,39 +203,19 @@ void PicturePanel::mark_unsaved()
 
 void PicturePanel::graph_dialog()
 {
-	auto elem = chart_dialog->getElements();
-	if (elem.has_value()) {
-		mark_unsaved();
-		formula_lines = elem.value();
-		draw_new_equations();
+	auto elems = chart_dialog->getElements();
+	if (!elems.size())
+		return;
+	mark_unsaved();
+	while (tabs->count()) {
+		tabs->widget(0)->deleteLater();
+		tabs->removeTab(0);
 	}
+	for (auto &[label, series] : elems)
+		add_chart(label, series);
 }
 
-void PicturePanel::draw_new_equations()
-{
-	auto new_chart = make_new_chart();
-	auto old_chart = this->chart();
-
-	for (auto &s : baseline) {
-		old_chart->removeSeries(s);
-		new_chart->addSeries(s);
-	}
-
-	for (auto &line : formula_lines) {
-		new_chart->addSeries(line);
-	}
-	new_chart->createDefaultAxes();
-	for (auto &axis : new_chart->axes()) {
-		if (draw_grid)
-			((QValueAxis *)axis)->applyNiceNumbers();
-		else
-			((QValueAxis *)axis)->setTickCount(2);
-	}
-	setChart(new_chart);
-	delete old_chart;
-}
-
-bool PicturePanel::input_latex(QPointF location)
+bool PictureTab::input_latex(QPointF location)
 {
 	QDialog dialog(this);
 	QFormLayout form(&dialog);
@@ -261,50 +259,57 @@ bool PicturePanel::input_latex(QPointF location)
 		texts[text_idx].font = doubleEdit->value();
 		texts[text_idx].coords = location;
 		texts[text_idx].pm = process_latex();
-		mark_unsaved();
+		owner->mark_unsaved();
 		return true;
 	}
 	return false;
 }
 
-void PicturePanel::mouseReleaseEvent(QMouseEvent *e)
+void PictureTab::mouseReleaseEvent(QMouseEvent *e)
 {
 	if (e->button() != Qt::LeftButton)
 		return;
 
 	mouse_pressed = false;
 
-	if (zoom_mode)
+	if (owner->zoom_mode)
 		chart()->zoomIn(QRectF{zoom_start, zoom_end}.normalized());
 	else if (text_idx == -1)
 		input_latex(widget2chart(e->pos()));
 	viewport()->update();
 }
 
-void PicturePanel::mouseMoveEvent(QMouseEvent *e)
+void PictureTab::mouseMoveEvent(QMouseEvent *e)
 {
 	auto coords = widget2chart(e->pos());
-	mw->control_panel->coords_text->setText(QString::number(coords.x(), 'g', 4) +
-	                                        ';' +
-	                                        QString::number(coords.y(), 'g', 4));
+	owner->mw->control_panel->coords_text->setText(
+	  QString::number(coords.x(), 'g', 4) + ';' +
+	  QString::number(coords.y(), 'g', 4));
 
 	if (!mouse_pressed)
 		return;
 
-	if (zoom_mode)
+	if (owner->zoom_mode)
 		zoom_end = e->pos();
 	else if (text_idx != -1)
 		texts[text_idx].coords = widget2chart(e->pos() - mouse_text_offset);
+	else
+		return;
 
 	viewport()->update();
 }
 
-QPointF PicturePanel::widget2chart(QPoint coord) const
+void PicturePanel::zoomReset()
+{
+	((PictureTab *)tabs->currentWidget())->chart()->zoomReset();
+}
+
+QPointF PictureTab::widget2chart(QPoint coord)
 {
 	return chart()->mapToValue(coord);
 }
 
-QPoint PicturePanel::chart2widget(QPointF coord) const
+QPoint PictureTab::chart2widget(QPointF coord)
 {
 	auto float_point = chart()->mapToPosition(coord);
 	return QPoint(float_point.x(), float_point.y());

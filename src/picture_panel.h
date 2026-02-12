@@ -6,6 +6,7 @@
 #include <klfbackend.h>
 
 class MainWindow;
+class PictureTab;
 constexpr double default_font = 7;
 
 struct Text {
@@ -32,19 +33,48 @@ struct Text {
 	Text() = default;
 };
 
-class PicturePanel : public QtCharts::QChartView {
+class PicturePanel : public QWidget {
 	MainWindow *mw;
-	bool making_cache{false};
-	bool draw_grid;
-	SeriesVec baseline; // Series provided not through
-	                    // formulas
-	QVector<Text> texts;
-	SeriesVec formula_lines;
+	QTabWidget *tabs;
+	QMap<int, PictureTab *> tab2chart;
 
 	bool zoom_mode{false};
+
+	bool draw_grid; // TODO maybe checkmark in dialog
+
+	ChartDialog *chart_dialog;
+
+	void draw_new_equations();
+
+	void mark_unsaved();
+	void add_chart(QString label,
+	               const QVector<QtCharts::QAbstractSeries *> &series);
+
+public:
+	PicturePanel(MainWindow *);
+	bool switch_zoom() { return zoom_mode = !zoom_mode; }
+	void graph_dialog();
+	void open_project(QString filename);
+	void save_project(QString filename);
+	void zoomReset();
+	friend class PictureTab;
+};
+
+class PictureTab : public QtCharts::QChartView {
+private:
+	PicturePanel *owner;
+
+	bool making_cache{false};
+
+	// For latex processing
+	KLFBackend::klfSettings settings;
+	KLFBackend::klfInput input;
+	QPixmap process_latex();
+	bool input_latex(QPointF location);
+	QVector<Text> texts;
 	int text_idx{-1};         // index of text under mouse cursor
-	QPoint mouse_text_offset; // Difference between mouse position when clicked on
-	                          // text and text pixmap top left corner
+	QPoint mouse_text_offset; // Difference between mouse position when clicked
+	                          // on text and text pixmap top left corner
 
 	bool mouse_pressed{false};
 	QPoint zoom_start;
@@ -52,29 +82,9 @@ class PicturePanel : public QtCharts::QChartView {
 
 	QPixmap cached_graph;
 
-	// For latex processing
-	KLFBackend::klfSettings settings;
-	KLFBackend::klfInput input;
-
-	ChartDialog *chart_dialog;
-
-	QPoint chart2widget(QPointF coord) const;
-	QPointF widget2chart(QPoint coord) const;
-
+	QPoint chart2widget(QPointF coord);
+	QPointF widget2chart(QPoint coord);
 	void find_text(QPoint pos); // check if there's latex text under mouse
-
-	QPixmap process_latex();
-	bool input_latex(QPointF location);
-	void draw_new_equations();
-
-	void mark_unsaved();
-
-public:
-	PicturePanel(MainWindow *, const SeriesVec &, bool grid);
-	bool switch_zoom() { return zoom_mode = !zoom_mode; }
-	void graph_dialog();
-	void open_project(QString filename);
-	void save_project(QString filename);
 
 protected:
 	void mouseMoveEvent(QMouseEvent *e) override;
@@ -82,4 +92,7 @@ protected:
 	void mouseReleaseEvent(QMouseEvent *e) override;
 	void mouseDoubleClickEvent(QMouseEvent *e) override;
 	void paintEvent(QPaintEvent *) override;
+
+public:
+	PictureTab(PicturePanel *o);
 };

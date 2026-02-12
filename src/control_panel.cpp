@@ -3,8 +3,6 @@
 #include <QPdfWriter>
 #include <QBitmap>
 #include <QShortcut>
-#include <iostream>
-#include <string>
 #include "widgets.h"
 #include "picture_panel.h"
 using namespace std;
@@ -37,7 +35,7 @@ ControlPanel::ControlPanel(MainWindow *parent): QWidget(parent), mw(parent)
 		zoom_button->setChecked(zoom);
 	});
 	connect(unzoom_button, &QPushButton::released, this,
-	        [this]() { mw->picture_panel->chart()->zoomReset(); });
+	        [this]() { mw->picture_panel->zoomReset(); });
 	connect(graph_button, &QPushButton::released, this,
 	        [this]() { mw->picture_panel->graph_dialog(); });
 
@@ -59,7 +57,6 @@ ControlPanel::ControlPanel(MainWindow *parent): QWidget(parent), mw(parent)
 	layout->addWidget(graph_button);
 	layout->addStretch(1);
 	layout->addWidget(coords_text);
-	setLayout(layout);
 }
 
 void ControlPanel::on_save()

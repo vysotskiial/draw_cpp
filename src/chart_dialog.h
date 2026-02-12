@@ -13,7 +13,9 @@
 #include <nlohmann/json.hpp>
 #include "formula_processor.h"
 
-using SeriesVec = QVector<QtCharts::QAbstractSeries *>;
+using SeriesInfo = std::map<QString, QVector<QtCharts::QAbstractSeries *>>;
+
+static const QString im_path = IMAGES_PATH;
 
 class AuxVarItem : public QWidget {
 	QLineEdit *name_edit;
@@ -35,6 +37,33 @@ public:
 };
 
 class ChartDialogTab;
+
+class ComponentChoice : public QWidget {
+	QVBoxLayout *layout;
+	struct PairEdit {
+		QComboBox *x;
+		QComboBox *y;
+		QPushButton *button;
+		PairEdit(ComponentChoice *parent, QComboBox *base);
+	};
+	QVector<PairEdit> edits;
+
+public:
+	struct CompPair {
+		int x_comp;
+		int y_comp;
+	};
+	ComponentChoice(QWidget *parent);
+	CompPair getComps(int pair_num)
+	{
+		return {edits[pair_num].x->currentIndex() - 1,
+		        edits[pair_num].y->currentIndex() - 1};
+	}
+	int comps_size() const { return edits.size(); }
+	void add_pair();
+	void comp_added(const QString &num);
+	void comp_removed();
+};
 
 class EquationsEdit : public QWidget {
 	ChartDialogTab *parent;
@@ -64,10 +93,9 @@ class ChartDialogTab : public QWidget {
 	EquationsEdit *equations_edit;
 	QDoubleSpinBox *step_edit;
 	QSpinBox *steps_num_edit;
-	QComboBox *x_comp_edit;
-	QComboBox *y_comp_edit;
 	InitEdit *init_edit;
 	QPushButton *color_button;
+	ComponentChoice *comp_choice;
 
 	std::vector<double> init_value;
 	VectorProcessor vp;
@@ -78,7 +106,7 @@ public:
 	bool check();
 	void comp_added(const QString &num);
 	void comp_removed();
-	QtCharts::QAbstractSeries *get();
+	void get(SeriesInfo &info);
 	operator nlohmann::json() const;
 	void from_json(const nlohmann::json &j);
 
@@ -94,7 +122,7 @@ private:
 	void rm_tab();
 
 public:
-	std::optional<SeriesVec> getElements();
+	SeriesInfo getElements();
 	operator nlohmann::json() const;
 	void import(const nlohmann::json &j);
 
